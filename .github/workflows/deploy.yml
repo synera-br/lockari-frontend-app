@@ -1,0 +1,100 @@
+
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main # Ou a branch que você usa para produção
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GAR_LOCATION: ${{ secrets.GAR_LOCATION }} # ex: us-central1
+  CLOUD_RUN_SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_NAME }}
+  CLOUD_RUN_REGION: ${{ secrets.CLOUD_RUN_REGION }} # ex: us-central1
+  SECRET_NAME_IN_MANAGER: ${{ secrets.SECRET_NAME_IN_MANAGER }}
+  ENV_VAR_NAME_FOR_SECRET_IN_RUN: ${{ secrets.ENV_VAR_NAME_FOR_SECRET_IN_RUN }} # Nome da var de ambiente no Cloud Run
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Mantenha sincronizado com o Dockerfile
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Lint
+        run: npm run lint
+
+      - name: Run Type Check
+        run: npm run typecheck
+      
+      - name: Build Next.js application (test build)
+        run: npm run build
+
+      - name: Set up GCloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Create or Update Secret in Secret Manager
+        run: |
+          echo "Checking for secret: ${{ env.SECRET_NAME_IN_MANAGER }}"
+          if ! gcloud secrets describe ${{ env.SECRET_NAME_IN_MANAGER }} --project="${{ env.GCP_PROJECT_ID }}" --quiet &> /dev/null; then
+            echo "Secret ${{ env.SECRET_NAME_IN_MANAGER }} does not exist. Creating..."
+            gcloud secrets create ${{ env.SECRET_NAME_IN_MANAGER }} \
+              --replication-policy="automatic" \
+              --project="${{ env.GCP_PROJECT_ID }}" --quiet
+          else
+            echo "Secret ${{ env.SECRET_NAME_IN_MANAGER }} already exists."
+          fi
+          
+          echo "Updating secret version for ${{ env.SECRET_NAME_IN_MANAGER }}"
+          echo -n "${{ secrets.SECRET_VALUE_FOR_MANAGER }}" | gcloud secrets versions add ${{ env.SECRET_NAME_IN_MANAGER }} \
+            --data-file=- \
+            --project="${{ env.GCP_PROJECT_ID }}" --quiet
+          echo "Latest version of secret ${{ env.SECRET_NAME_IN_MANAGER }} updated."
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        env:
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
+        run: docker build -t $IMAGE_NAME -f Dockerfile .
+
+      - name: Push Docker image to Artifact Registry
+        env:
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
+        run: docker push $IMAGE_NAME
+
+      - name: Deploy to Cloud Run
+        env:
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
+        run: |
+          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE_NAME }} \
+            --image ${{ env.IMAGE_NAME }} \
+            --region ${{ env.CLOUD_RUN_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 3000 \
+            --update-secrets=${{ env.ENV_VAR_NAME_FOR_SECRET_IN_RUN }}=${{ env.SECRET_NAME_IN_MANAGER }}:latest \
+            --project ${{ env.GCP_PROJECT_ID }} \
+            --quiet
