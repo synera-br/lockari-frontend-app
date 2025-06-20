@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react'; // Changed from 'react-dom'
+import { useFormStatus } from 'react-dom';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,7 +43,7 @@ function SubmitButton({ label }: { label: string }) {
 }
 
 export default function ContactForm({ dictionary }: ContactFormProps) {
-  const [state, formAction] = useFormState(submitContactForm, initialState);
+  const [state, formAction] = useActionState(submitContactForm, initialState); // Renamed useFormState to useActionState
   const { toast } = useToast();
 
   useEffect(() => {
