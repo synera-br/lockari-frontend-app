@@ -1,3 +1,4 @@
+
 import type { ReactNode } from 'react';
 import type { Locale } from '@/middleware';
 import { getDictionary } from '@/dictionaries';
@@ -20,9 +21,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default function LangLayout({ children, params }: Props) {
-  return (
-    <html lang={params.lang} suppressHydrationWarning>
-      <body>{children}</body>
-    </html>
-  );
+  // This layout is nested within RootLayout (src/app/layout.tsx).
+  // It should not re-render <html> or <body> tags.
+  // The `lang` attribute from params.lang was previously on this layout's <html> tag.
+  // RootLayout's <html> tag (currently with lang="en") will now be the sole one.
+  // This change primarily fixes the hydration error due to nested document structures.
+  return <>{children}</>;
 }
