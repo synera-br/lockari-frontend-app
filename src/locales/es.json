@@ -1,0 +1,76 @@
+{
+  "appName": "SecureCore Vault",
+  "nav": {
+    "features": "Características",
+    "pricing": "Precios",
+    "contact": "Contacto"
+  },
+  "hero": {
+    "title": "Tu Fortaleza Digital para Secretos",
+    "subtitle": "Administra de forma segura tus secretos, claves, certificados y claves SSH con facilidad y confianza. Centralizado, encriptado y siempre accesible.",
+    "cta": "Comienza Gratis",
+    "learnMore": "Aprende Más"
+  },
+  "features": {
+    "title": "Características Principales",
+    "secretsManagement": {
+      "title": "Gestión de Secretos",
+      "description": "Almacena claves de API, contraseñas y otros datos sensibles con encriptación robusta."
+    },
+    "keyValueStore": {
+      "title": "Almacén Seguro de Clave/Valor",
+      "description": "Almacenamiento flexible para configuraciones de aplicaciones y parámetros sensibles."
+    },
+    "certificateManagement": {
+      "title": "Gestión de Certificados",
+      "description": "Administra certificados SSL/TLS, rastrea fechas de caducidad y automatiza renovaciones."
+    },
+    "sshKeyManagement": {
+      "title": "Gestión de Claves SSH",
+      "description": "Centraliza y controla el acceso a tus servidores con almacenamiento seguro de claves SSH."
+    }
+  },
+  "pricing": {
+    "title": "Planes Flexibles",
+    "comingSoon": "¡Planes de precios próximamente! Comienza con nuestro nivel gratuito.",
+    "freeTier": {
+      "name": "Nivel Gratuito",
+      "description": "Perfecto para individuos y proyectos pequeños.",
+      "cta": "Regístrate"
+    },
+    "proTier": {
+      "name": "Nivel Pro",
+      "description": "Para equipos en crecimiento y empresas que necesitan más potencia.",
+      "cta": "Aprende Más"
+    },
+    "enterpriseTier": {
+      "name": "Empresarial",
+      "description": "Soluciones personalizadas para grandes organizaciones.",
+      "cta": "Contactar Ventas"
+    }
+  },
+  "contact": {
+    "title": "Ponte en Contacto",
+    "subtitle": "¿Tienes preguntas o necesitas una solución personalizada? Estamos aquí para ayudar.",
+    "name": "Nombre",
+    "namePlaceholder": "Tu Nombre",
+    "email": "Correo Electrónico",
+    "emailPlaceholder": "tu.email@ejemplo.com",
+    "message": "Mensaje",
+    "messagePlaceholder": "Tu mensaje...",
+    "submit": "Enviar Mensaje",
+    "success": "¡Mensaje enviado con éxito! Nos pondremos en contacto pronto.",
+    "error": "Error al enviar el mensaje. Por favor, inténtalo de nuevo."
+  },
+  "footer": {
+    "copyright": "© {year} SecureCore Vault. Todos los derechos reservados.",
+    "privacyPolicy": "Política de Privacidad",
+    "termsOfService": "Términos de Servicio"
+  },
+  "languageSwitcher": {
+    "label": "Seleccionar Idioma",
+    "en": "Inglés",
+    "pt": "Portugués",
+    "es": "Español"
+  }
+}

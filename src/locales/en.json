@@ -1,0 +1,76 @@
+{
+  "appName": "SecureCore Vault",
+  "nav": {
+    "features": "Features",
+    "pricing": "Pricing",
+    "contact": "Contact"
+  },
+  "hero": {
+    "title": "Your Digital Fortress for Secrets",
+    "subtitle": "Securely manage your secrets, keys, certificates, and SSH keys with ease and confidence. Centralized, encrypted, and always accessible.",
+    "cta": "Get Started Free",
+    "learnMore": "Learn More"
+  },
+  "features": {
+    "title": "Core Features",
+    "secretsManagement": {
+      "title": "Secrets Management",
+      "description": "Store API keys, passwords, and other sensitive data with robust encryption."
+    },
+    "keyValueStore": {
+      "title": "Secure Key/Value Store",
+      "description": "Flexible storage for application configurations and sensitive parameters."
+    },
+    "certificateManagement": {
+      "title": "Certificate Management",
+      "description": "Manage SSL/TLS certificates, track expiration dates, and automate renewals."
+    },
+    "sshKeyManagement": {
+      "title": "SSH Key Management",
+      "description": "Centralize and control access to your servers with secure SSH key storage."
+    }
+  },
+  "pricing": {
+    "title": "Flexible Plans",
+    "comingSoon": "Pricing plans coming soon! Get started with our free tier.",
+    "freeTier": {
+      "name": "Free Tier",
+      "description": "Perfect for individuals and small projects.",
+      "cta": "Sign Up"
+    },
+    "proTier": {
+      "name": "Pro Tier",
+      "description": "For growing teams and businesses needing more power.",
+      "cta": "Learn More"
+    },
+    "enterpriseTier": {
+      "name": "Enterprise",
+      "description": "Tailored solutions for large organizations.",
+      "cta": "Contact Sales"
+    }
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "subtitle": "Have questions or need a custom solution? We're here to help.",
+    "name": "Name",
+    "namePlaceholder": "Your Name",
+    "email": "Email",
+    "emailPlaceholder": "your.email@example.com",
+    "message": "Message",
+    "messagePlaceholder": "Your message...",
+    "submit": "Send Message",
+    "success": "Message sent successfully! We'll be in touch soon.",
+    "error": "Failed to send message. Please try again."
+  },
+  "footer": {
+    "copyright": "© {year} SecureCore Vault. All rights reserved.",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
+  },
+  "languageSwitcher": {
+    "label": "Select Language",
+    "en": "English",
+    "pt": "Português",
+    "es": "Español"
+  }
+}
