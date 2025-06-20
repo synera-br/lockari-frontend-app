@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
@@ -21,6 +22,12 @@ interface LanguageSwitcherProps {
   };
 }
 
+interface LanguageOption {
+  locale: Locale;
+  name: string;
+  flag: string;
+}
+
 export default function LanguageSwitcher({ currentLocale, dictionary }: LanguageSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -31,14 +38,11 @@ export default function LanguageSwitcher({ currentLocale, dictionary }: Language
     router.push(newPath);
   };
 
-  const getLanguageName = (locale: Locale) => {
-    switch (locale) {
-      case 'en': return dictionary.en;
-      case 'pt': return dictionary.pt;
-      case 'es': return dictionary.es;
-      default: return locale.toUpperCase();
-    }
-  }
+  const languageOptions: LanguageOption[] = [
+    { locale: 'en', name: dictionary.en, flag: '🇺🇸' },
+    { locale: 'pt', name: dictionary.pt, flag: '🇧🇷' },
+    { locale: 'es', name: dictionary.es, flag: '🇪🇸' },
+  ];
 
   return (
     <DropdownMenu>
@@ -48,13 +52,15 @@ export default function LanguageSwitcher({ currentLocale, dictionary }: Language
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {locales.map((locale) => (
+        {languageOptions.map((option) => (
           <DropdownMenuItem
-            key={locale}
-            onClick={() => handleLocaleChange(locale)}
-            disabled={currentLocale === locale}
+            key={option.locale}
+            onClick={() => handleLocaleChange(option.locale)}
+            disabled={currentLocale === option.locale}
+            className="flex items-center gap-2"
           >
-            {getLanguageName(locale)}
+            <span>{option.flag}</span>
+            <span>{option.name}</span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
