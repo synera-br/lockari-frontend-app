@@ -4,15 +4,18 @@ name: Deploy to Google Cloud Run
 on:
   push:
     branches:
-      - main # Ou a branch que você usa para produção
+      - main
+      - develop
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GAR_LOCATION: ${{ secrets.GAR_LOCATION }} # ex: us-central1
-  CLOUD_RUN_SERVICE_NAME: ${{ secrets.CLOUD_RUN_SERVICE_NAME }}
-  CLOUD_RUN_REGION: ${{ secrets.CLOUD_RUN_REGION }} # ex: us-central1
-  SECRET_NAME_IN_MANAGER: ${{ secrets.SECRET_NAME_IN_MANAGER }}
-  ENV_VAR_NAME_FOR_SECRET_IN_RUN: ${{ secrets.ENV_VAR_NAME_FOR_SECRET_IN_RUN }} # Nome da var de ambiente no Cloud Run
+  GAR_LOCATION: ${{ secrets.GAR_LOCATION }} 
+  CLOUD_RUN_REGION: ${{ secrets.CLOUD_RUN_REGION }}
+  
+  # Base names for services and secrets - User needs to set these in GitHub Secrets
+  CLOUD_RUN_SERVICE_NAME_BASE: ${{ secrets.CLOUD_RUN_SERVICE_NAME_BASE }} 
+  SECRET_NAME_IN_MANAGER_BASE: ${{ secrets.SECRET_NAME_IN_MANAGER_BASE }}
+  ENV_VAR_NAME_FOR_SECRET_IN_RUN_BASE: ${{ secrets.ENV_VAR_NAME_FOR_SECRET_IN_RUN_BASE }}
 
 jobs:
   build-and-deploy:
@@ -21,8 +24,45 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+    
+    # These env vars will be set dynamically in the first step
+    env: 
+      FINAL_CLOUD_RUN_SERVICE_NAME: ''
+      FINAL_SECRET_NAME_IN_MANAGER: ''
+      FINAL_ENV_VAR_NAME_FOR_SECRET_IN_RUN: ''
+      ACTUAL_SECRET_VALUE: ''
+      IMAGE_TAG_SUFFIX: ''
+      ENVIRONMENT_NAME: ''
 
     steps:
+      - name: Determine Environment and Set Variables
+        run: |
+          if [ "${{ github.ref_name }}" == "develop" ]; then
+            echo "ENVIRONMENT_NAME=develop" >> $GITHUB_ENV
+            echo "FINAL_CLOUD_RUN_SERVICE_NAME=${{ env.CLOUD_RUN_SERVICE_NAME_BASE }}-dev" >> $GITHUB_ENV
+            echo "FINAL_SECRET_NAME_IN_MANAGER=${{ env.SECRET_NAME_IN_MANAGER_BASE }}_DEV" >> $GITHUB_ENV
+            echo "FINAL_ENV_VAR_NAME_FOR_SECRET_IN_RUN=${{ env.ENV_VAR_NAME_FOR_SECRET_IN_RUN_BASE }}_DEV" >> $GITHUB_ENV
+            echo "ACTUAL_SECRET_VALUE=${{ secrets.SECRET_VALUE_DEVELOP }}" >> $GITHUB_ENV
+            echo "IMAGE_TAG_SUFFIX=-dev" >> $GITHUB_ENV
+          elif [ "${{ github.ref_name }}" == "main" ]; then
+            echo "ENVIRONMENT_NAME=production" >> $GITHUB_ENV
+            echo "FINAL_CLOUD_RUN_SERVICE_NAME=${{ env.CLOUD_RUN_SERVICE_NAME_BASE }}" >> $GITHUB_ENV
+            echo "FINAL_SECRET_NAME_IN_MANAGER=${{ env.SECRET_NAME_IN_MANAGER_BASE }}" >> $GITHUB_ENV
+            echo "FINAL_ENV_VAR_NAME_FOR_SECRET_IN_RUN=${{ env.ENV_VAR_NAME_FOR_SECRET_IN_RUN_BASE }}" >> $GITHUB_ENV
+            echo "ACTUAL_SECRET_VALUE=${{ secrets.SECRET_VALUE_MAIN }}" >> $GITHUB_ENV
+            echo "IMAGE_TAG_SUFFIX=" >> $GITHUB_ENV # Or -prod / -main if desired
+          else
+            echo "Unsupported branch: ${{ github.ref_name }}. Exiting."
+            exit 1
+          fi
+          echo "--------------------------------------------------"
+          echo "Deploying for environment: $ENVIRONMENT_NAME"
+          echo "Cloud Run Service Name: $FINAL_CLOUD_RUN_SERVICE_NAME"
+          echo "Secret Name in Manager: $FINAL_SECRET_NAME_IN_MANAGER"
+          echo "Env Var for Secret in Run: $FINAL_ENV_VAR_NAME_FOR_SECRET_IN_RUN"
+          echo "Image Tag Suffix: $IMAGE_TAG_SUFFIX"
+          echo "--------------------------------------------------"
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -35,7 +75,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Mantenha sincronizado com o Dockerfile
+          node-version: '20' 
 
       - name: Install dependencies
         run: npm ci
@@ -56,45 +96,51 @@ jobs:
 
       - name: Create or Update Secret in Secret Manager
         run: |
-          echo "Checking for secret: ${{ env.SECRET_NAME_IN_MANAGER }}"
-          if ! gcloud secrets describe ${{ env.SECRET_NAME_IN_MANAGER }} --project="${{ env.GCP_PROJECT_ID }}" --quiet &> /dev/null; then
-            echo "Secret ${{ env.SECRET_NAME_IN_MANAGER }} does not exist. Creating..."
-            gcloud secrets create ${{ env.SECRET_NAME_IN_MANAGER }} \
+          echo "Checking for secret: ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} in project ${{ env.GCP_PROJECT_ID }}"
+          if ! gcloud secrets describe ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} --project="${{ env.GCP_PROJECT_ID }}" --quiet &> /dev/null; then
+            echo "Secret ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} does not exist. Creating..."
+            gcloud secrets create ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} \
               --replication-policy="automatic" \
               --project="${{ env.GCP_PROJECT_ID }}" --quiet
           else
-            echo "Secret ${{ env.SECRET_NAME_IN_MANAGER }} already exists."
+            echo "Secret ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} already exists."
           fi
           
-          echo "Updating secret version for ${{ env.SECRET_NAME_IN_MANAGER }}"
-          echo -n "${{ secrets.SECRET_VALUE_FOR_MANAGER }}" | gcloud secrets versions add ${{ env.SECRET_NAME_IN_MANAGER }} \
+          echo "Updating secret version for ${{ env.FINAL_SECRET_NAME_IN_MANAGER }}"
+          echo -n "${{ env.ACTUAL_SECRET_VALUE }}" | gcloud secrets versions add ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} \
             --data-file=- \
             --project="${{ env.GCP_PROJECT_ID }}" --quiet
-          echo "Latest version of secret ${{ env.SECRET_NAME_IN_MANAGER }} updated."
+          echo "Latest version of secret ${{ env.FINAL_SECRET_NAME_IN_MANAGER }} updated."
 
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
       - name: Build Docker image
         env:
-          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
-        run: docker build -t $IMAGE_NAME -f Dockerfile .
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }}/app${{ env.IMAGE_TAG_SUFFIX }}:${{ github.sha }}
+        run: |
+          echo "Building Docker image: $IMAGE_NAME"
+          docker build -t $IMAGE_NAME -f Dockerfile .
 
       - name: Push Docker image to Artifact Registry
         env:
-          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
-        run: docker push $IMAGE_NAME
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }}/app${{ env.IMAGE_TAG_SUFFIX }}:${{ github.sha }}
+        run: |
+          echo "Pushing Docker image: $IMAGE_NAME"
+          docker push $IMAGE_NAME
 
       - name: Deploy to Cloud Run
         env:
-          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.CLOUD_RUN_SERVICE_NAME }}/app:${{ github.sha }}
+          IMAGE_NAME: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }}/app${{ env.IMAGE_TAG_SUFFIX }}:${{ github.sha }}
         run: |
-          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE_NAME }} \
+          echo "Deploying image $IMAGE_NAME to Cloud Run service ${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }}"
+          gcloud run deploy ${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }} \
             --image ${{ env.IMAGE_NAME }} \
             --region ${{ env.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 3000 \
-            --update-secrets=${{ env.ENV_VAR_NAME_FOR_SECRET_IN_RUN }}=${{ env.SECRET_NAME_IN_MANAGER }}:latest \
+            --update-secrets=${{ env.FINAL_ENV_VAR_NAME_FOR_SECRET_IN_RUN }}=${{ env.FINAL_SECRET_NAME_IN_MANAGER }}:latest \
             --project ${{ env.GCP_PROJECT_ID }} \
             --quiet
+          echo "Deployment to ${{ env.FINAL_CLOUD_RUN_SERVICE_NAME }} completed."
