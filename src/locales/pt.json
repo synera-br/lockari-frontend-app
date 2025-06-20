@@ -65,7 +65,9 @@
   "footer": {
     "copyright": "© {year} SecureCore Vault. Todos os direitos reservados.",
     "privacyPolicy": "Política de Privacidade",
-    "termsOfService": "Termos de Serviço"
+    "termsOfService": "Termos de Serviço",
+    "developedByPrefix": "Desenvolvido por ",
+    "developerName": "Synera"
   },
   "languageSwitcher": {
     "label": "Selecionar Idioma",

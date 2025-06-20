@@ -9,6 +9,8 @@ interface FooterProps {
     copyright: string;
     privacyPolicy: string;
     termsOfService: string;
+    developedByPrefix: string;
+    developerName: string;
   };
 }
 
@@ -31,6 +33,12 @@ export default function Footer({ lang, dictionary }: FooterProps) {
             </Link>
             <p className="text-sm text-muted-foreground text-center md:text-left">
               {dictionary.copyright.replace('{year}', currentYear.toString())}
+            </p>
+            <p className="text-sm text-muted-foreground text-center md:text-left mt-1">
+              {dictionary.developedByPrefix}
+              <Link href="https://www.synera.com.br" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors font-medium">
+                {dictionary.developerName}
+              </Link>
             </p>
           </div>
 

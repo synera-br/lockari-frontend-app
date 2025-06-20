@@ -31,7 +31,9 @@ export default async function LandingPage({ params: { lang } }: Props) {
         appName: dict.appName,
         copyright: dict.footer.copyright,
         privacyPolicy: dict.footer.privacyPolicy,
-        termsOfService: dict.footer.termsOfService
+        termsOfService: dict.footer.termsOfService,
+        developedByPrefix: dict.footer.developedByPrefix,
+        developerName: dict.footer.developerName
       }} />
     </>
   );
