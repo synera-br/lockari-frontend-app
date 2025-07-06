@@ -36,16 +36,31 @@
     "freeTier": {
       "name": "Nivel Gratuito",
       "description": "Perfecto para individuos y proyectos pequeños.",
+      "features": [
+        "Almacenamiento Básico de Secretos",
+        "1 Usuario",
+        "Soporte de la Comunidad"
+      ],
       "cta": "Regístrate"
     },
     "proTier": {
       "name": "Nivel Pro",
       "description": "Para equipos en crecimiento y empresas que necesitan más potencia.",
+      "features": [
+        "Funciones Avanzadas",
+        "Múltiples Usuarios",
+        "Soporte Prioritario"
+      ],
       "cta": "Aprende Más"
     },
     "enterpriseTier": {
       "name": "Empresarial",
       "description": "Soluciones personalizadas para grandes organizaciones.",
+      "features": [
+        "Infraestructura Dedicada",
+        "SLA",
+        "Soporte Premium"
+      ],
       "cta": "Contactar Ventas"
     }
   },

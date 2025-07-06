@@ -36,16 +36,31 @@
     "freeTier": {
       "name": "Plano Gratuito",
       "description": "Perfeito para indivíduos e pequenos projetos.",
+      "features": [
+        "Armazenamento Básico de Segredos",
+        "1 Usuário",
+        "Suporte da Comunidade"
+      ],
       "cta": "Inscreva-se"
     },
     "proTier": {
       "name": "Plano Pro",
       "description": "Para equipes em crescimento e empresas que precisam de mais poder.",
+      "features": [
+        "Recursos Avançados",
+        "Múltiplos Usuários",
+        "Suporte Prioritário"
+      ],
       "cta": "Saiba Mais"
     },
     "enterpriseTier": {
       "name": "Empresarial",
       "description": "Soluções personalizadas para grandes organizações.",
+      "features": [
+        "Infraestrutura Dedicada",
+        "SLA",
+        "Suporte Premium"
+      ],
       "cta": "Contatar Vendas"
     }
   },

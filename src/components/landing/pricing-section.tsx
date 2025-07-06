@@ -9,9 +9,9 @@ interface PricingSectionProps {
   dictionary: {
     title: string;
     comingSoon: string;
-    freeTier: { name: string; description: string; cta: string };
-    proTier: { name: string; description: string; cta: string };
-    enterpriseTier: { name: string; description: string; cta: string };
+    freeTier: { name: string; description: string; features: string[]; cta: string };
+    proTier: { name: string; description: string; features: string[]; cta: string };
+    enterpriseTier: { name: string; description: string; features: string[]; cta: string };
   };
 }
 
@@ -22,7 +22,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       description: dictionary.freeTier.description,
       price: '$0',
       period: '/month',
-      features: ['Basic Secret Storage', '1 User', 'Community Support'],
+      features: dictionary.freeTier.features,
       cta: dictionary.freeTier.cta,
       href: `/${lang}/auth/signup`, // Placeholder
       variant: 'outline' as const,
@@ -32,7 +32,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       description: dictionary.proTier.description,
       price: 'Coming Soon',
       period: '',
-      features: ['Advanced Features', 'Multiple Users', 'Priority Support'],
+      features: dictionary.proTier.features,
       cta: dictionary.proTier.cta,
       href: `/${lang}#contact`, // Placeholder
       variant: 'default' as const,
@@ -43,7 +43,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       description: dictionary.enterpriseTier.description,
       price: 'Custom',
       period: '',
-      features: ['Dedicated Infrastructure', 'SLA', 'Premium Support'],
+      features: dictionary.enterpriseTier.features,
       cta: dictionary.enterpriseTier.cta,
       href: `/${lang}#contact`, // Placeholder
       variant: 'outline' as const,

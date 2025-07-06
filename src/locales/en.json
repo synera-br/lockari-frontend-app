@@ -36,16 +36,31 @@
     "freeTier": {
       "name": "Free Tier",
       "description": "Perfect for individuals and small projects.",
+      "features": [
+        "Basic Secret Storage",
+        "1 User",
+        "Community Support"
+      ],
       "cta": "Sign Up"
     },
     "proTier": {
       "name": "Pro Tier",
       "description": "For growing teams and businesses needing more power.",
+      "features": [
+        "Advanced Features",
+        "Multiple Users",
+        "Priority Support"
+      ],
       "cta": "Learn More"
     },
     "enterpriseTier": {
       "name": "Enterprise",
       "description": "Tailored solutions for large organizations.",
+      "features": [
+        "Dedicated Infrastructure",
+        "SLA",
+        "Premium Support"
+      ],
       "cta": "Contact Sales"
     }
   },
