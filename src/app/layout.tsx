@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'SecureCore Vault',
-  description: 'Securely manage your secrets, keys, certificates, and SSH keys with SecureCore Vault.',
+  title: 'Lockari Vault',
+  description: 'Securely manage your secrets, keys, certificates, and SSH keys with Lockari Vault.',
   keywords: 'vault de secrets, armazenamento seguro de chaves, gestão de certificados, SSH keys, secret management, secure storage',
 };
 

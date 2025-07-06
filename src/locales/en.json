@@ -1,5 +1,5 @@
 {
-  "appName": "SecureCore Vault",
+  "appName": "Lockari Vault",
   "nav": {
     "features": "Features",
     "pricing": "Pricing",
@@ -78,7 +78,7 @@
     "error": "Failed to send message. Please try again."
   },
   "footer": {
-    "copyright": "© {year} SecureCore Vault. All rights reserved.",
+    "copyright": "© {year} Lockari Vault. All rights reserved.",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
     "developedByPrefix": "Developed by ",
