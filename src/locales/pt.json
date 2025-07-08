@@ -1,3 +1,4 @@
+
 {
   "appName": "Lockari Vault",
   "nav": {
@@ -37,29 +38,32 @@
       "name": "Plano Gratuito",
       "description": "Perfeito para indivíduos e pequenos projetos.",
       "features": [
-        "Armazenamento Básico de Segredos",
-        "1 Usuário",
+        "1 cofre",
+        "10 itens (segredos, chaves, etc.)",
+        "Até 3 usuários",
         "Suporte da Comunidade"
       ],
-      "cta": "Inscreva-se"
+      "cta": "Inscreva-se Gratuitamente"
     },
     "proTier": {
       "name": "Plano Pro",
       "description": "Para equipes em crescimento e empresas que precisam de mais poder.",
       "features": [
-        "Recursos Avançados",
-        "Múltiplos Usuários",
+        "3 cofres",
+        "100 itens",
+        "Até 10 usuários",
         "Suporte Prioritário"
       ],
-      "cta": "Saiba Mais"
+      "cta": "Iniciar Teste Pro"
     },
     "enterpriseTier": {
       "name": "Empresarial",
       "description": "Soluções personalizadas para grandes organizações.",
       "features": [
-        "Infraestrutura Dedicada",
-        "SLA",
-        "Suporte Premium"
+        "Cofres e itens ilimitados",
+        "Login Único (SSO)",
+        "Suporte Premium e SLA",
+        "Integrações Personalizadas"
       ],
       "cta": "Contatar Vendas"
     }
@@ -89,5 +93,171 @@
     "en": "Inglês",
     "pt": "Português",
     "es": "Espanhol"
+  },
+  "auth": {
+    "loginTitle": "Bem-vindo de Volta",
+    "loginSubtitle": "Insira suas credenciais para acessar seu cofre.",
+    "signupTitle": "Crie Sua Conta",
+    "signupSubtitle": "Comece sua jornada para o gerenciamento seguro de segredos.",
+    "planLabel": "Plano",
+    "emailLabel": "Email",
+    "emailPlaceholder": "nome@exemplo.com",
+    "passwordLabel": "Senha",
+    "nameLabel": "Nome Completo",
+    "namePlaceholder": "João da Silva",
+    "confirmPasswordLabel": "Confirmar Senha",
+    "loginButton": "Entrar",
+    "signupButton": "Criar Conta",
+    "orContinueWith": "Ou continue com",
+    "loginCta": "Já tem uma conta?",
+    "loginLink": "Entrar",
+    "signupCta": "Não tem uma conta?",
+    "signupLink": "Cadastre-se",
+    "signOutButton": "Sair",
+    "welcomeTitle": "Bem-vindo",
+    "welcomeSubtitle": "Este é o seu painel de controle pessoal.",
+    "dashboardWip": "Esta área está em construção. Volte em breve para gerenciar seus segredos!",
+    "errorInvalidCredential": "E-mail ou senha inválidos. Por favor, tente novamente.",
+    "errorInvalidEmail": "Por favor, insira um endereço de e-mail válido.",
+    "errorEmailInUse": "Este e-mail já está em uso. Por favor, tente outro.",
+    "errorWeakPassword": "A senha é muito fraca. Deve ter pelo menos 8 caracteres.",
+    "errorPasswordRequired": "A senha é obrigatória.",
+    "errorPasswordsDoNotMatch": "As senhas não correspondem.",
+    "errorNameTooShort": "O nome deve ter pelo menos 2 caracteres.",
+    "errorGeneric": "Ocorreu um erro inesperado. Por favor, tente novamente.",
+    "errorAccountExists": "Já existe uma conta com este e-mail usando um método de login diferente.",
+    "errorGoogleSignInFailed": "Falha no login com o Google. Verifique a configuração do seu projeto Firebase e tente novamente.",
+    "termsAgreementPrefix": "Ao continuar, você concorda com nossos ",
+    "termsAgreementLink": "Termos de Serviço",
+    "termsAgreementSuffix": "."
+  },
+  "dashboard": {
+    "nav": {
+      "dashboard": "Painel",
+      "vaults": "Cofres",
+      "accessControl": "Controle de Acesso",
+      "auditTrail": "Trilha de Auditoria",
+      "account": "Conta"
+    },
+    "userNav": {
+      "profile": "Perfil",
+      "support": "Suporte",
+      "signOut": "Sair"
+    },
+    "wip": "Esta funcionalidade está em construção. Por favor, volte mais tarde.",
+    "supportForm": {
+      "title": "Enviar uma Solicitação",
+      "description": "Como podemos ajudar hoje? Por favor, preencha o formulário abaixo.",
+      "subject": "Assunto",
+      "subjectPlaceholder": "ex: Problema ao compartilhar cofre",
+      "type": "Tipo de Solicitação",
+      "typePlaceholder": "Selecione um tipo",
+      "types": {
+        "support": "Suporte",
+        "feedback": "Feedback",
+        "newFeature": "Sugestão de Nova Funcionalidade"
+      },
+      "category": "Categoria",
+      "categoryPlaceholder": "Selecione uma categoria",
+      "categories": {
+        "other": "Outro"
+      },
+      "message": "Mensagem",
+      "messagePlaceholder": "Por favor, descreva sua solicitação em detalhes...",
+      "submit": "Enviar Solicitação",
+      "successTitle": "Solicitação Enviada",
+      "successDescription": "Obrigado! Recebemos sua solicitação e entraremos em contato em breve.",
+      "errorTitle": "Falha no Envio",
+      "errorDescription": "Houve um erro ao enviar sua solicitação. Por favor, tente novamente."
+    },
+    "vaults": {
+      "title": "Meus Cofres",
+      "createNew": "Criar Novo Cofre",
+      "searchPlaceholder": "Buscar cofres...",
+      "backToVaults": "Voltar para todos os cofres",
+      "emptyState": {
+        "title": "Nenhum Cofre Encontrado",
+        "description": "Comece criando seu primeiro cofre para armazenar seus segredos de forma segura.",
+        "noResultsTitle": "Nenhum Resultado Encontrado",
+        "noResultsDescription": "Sua busca não correspondeu a nenhum cofre. Tente um termo diferente."
+      },
+      "createDialog": {
+        "title": "Criar um Novo Cofre",
+        "description": "Cofres são contêineres seguros para seus segredos. Dê um nome ao seu novo cofre para começar.",
+        "nameLabel": "Nome do Cofre",
+        "namePlaceholder": "ex: Chaves de API de Produção",
+        "descriptionLabel": "Descrição (Opcional)",
+        "descriptionPlaceholder": "Uma breve descrição do propósito deste cofre.",
+        "tagsLabel": "Tags (Opcional)",
+        "tagsPlaceholder": "ex: producao, api, backend",
+        "tagsHint": "Separe as tags com uma vírgula.",
+        "cancel": "Cancelar",
+        "submit": "Criar Cofre"
+      },
+      "formFeedback": {
+        "successTitle": "Cofre Criado",
+        "successDescription": "Seu novo cofre foi criado com sucesso.",
+        "errorTitle": "Criação Falhou",
+        "errorDescription": "Não foi possível criar o cofre. Por favor, tente novamente.",
+        "validationError": "Por favor, verifique o formulário em busca de erros."
+      }
+    },
+    "stats": {
+      "totalVaults": "Total de Cofres",
+      "totalSecrets": "Total de Segredos",
+      "totalCertificates": "Total de Certificados",
+      "totalSshKeys": "Total de Chaves SSH",
+      "viewDetails": "Ver Detalhes"
+    }
+  },
+  "termsDialog": {
+    "title": "Bem-vindo ao Lockari Vault!",
+    "introduction": "Antes de começar, por favor, revise nossos termos. O Lockari Vault é uma plataforma projetada para armazenar e gerenciar com segurança seus segredos, chaves e certificados, garantindo que seus ativos digitais estejam protegidos.",
+    "securityPledge": "Temos um compromisso com a sua segurança. Todos os dados armazenados em nossa plataforma são criptografados usando as melhores práticas da indústria. Suas informações sensíveis nunca são armazenadas em texto plano.",
+    "agreementClause": "Ao clicar em 'Aceitar e Continuar', você confirma que leu e concorda com os seguintes pontos:",
+    "items": [
+      "Você concorda em usar a plataforma e reconhece que armazenaremos seus dados de forma segura para fornecer nossos serviços.",
+      "Você entende que todos os dados sensíveis são criptografados em repouso e em trânsito.",
+      "Você é responsável por manter a confidencialidade da senha da sua conta.",
+      "Você concorda em não usar a plataforma para fins ilegais ou não autorizados.",
+      "Faremos esforços razoáveis para garantir a disponibilidade da plataforma, mas não garantimos um serviço ininterrupto.",
+      "Podemos atualizar a plataforma e seus serviços de tempos em tempos para melhorar a funcionalidade e a segurança.",
+      "Nós nunca venderemos seus dados pessoais, como seu endereço de e-mail, a terceiros.",
+      "Para planos pagos, usamos um processador de pagamentos líder e seguro. Os detalhes do seu cartão nunca são armazenados em nossos servidores.",
+      "Você pode exportar seus dados a qualquer momento, sujeito aos recursos do seu plano.",
+      "Você pode cancelar sua assinatura a qualquer momento. Não há contratos de longo prazo ou períodos de fidelidade."
+    ],
+    "acceptButton": "Aceitar e Continuar"
+  },
+  "termsPage": {
+    "title": "Termos de Serviço",
+    "lastUpdated": "Última atualização: 17 de maio de 2024",
+    "introduction": "Bem-vindo ao Lockari Vault. Estes Termos de Serviço ('Termos') regem seu acesso e uso dos serviços, website e aplicativos do Lockari Vault (coletivamente, a 'Plataforma'). Ao usar a Plataforma, você concorda em ficar vinculado a estes Termos.",
+    "sections": [
+      {
+        "title": "1. Introdução à Plataforma",
+        "content": "O Lockari Vault oferece um ambiente seguro para o gerenciamento de segredos digitais, incluindo, mas não se limitando a, chaves de API, senhas, certificados e chaves SSH. Nosso objetivo é fornecer um serviço confiável e seguro, seguindo as melhores práticas de mercado em cibersegurança."
+      },
+      {
+        "title": "2. Segurança e Criptografia de Dados",
+        "content": "Estamos comprometidos com a segurança dos seus dados. Todas as informações que você armazena na Plataforma são criptografadas em repouso e em trânsito, usando protocolos de criptografia fortes. Dados sensíveis nunca são armazenados em formato de texto plano, garantindo que apenas você possa acessar seus segredos."
+      }
+    ],
+    "agreement": {
+      "title": "3. Acordo do Usuário",
+      "description": "Ao criar uma conta e usar a Plataforma, você reconhece e concorda com os seguintes pontos:",
+      "items": [
+        "Você concorda em usar a plataforma e está ciente de que armazenamos seus dados de forma segura para fornecer nossos serviços.",
+        "Você entende que todos os dados sensíveis são criptografados em repouso e em trânsito, e nunca armazenados em texto plano.",
+        "Você é responsável por manter a confidencialidade da senha de sua conta e por todas as atividades que ocorram em sua conta.",
+        "Você concorda em não usar a Plataforma para fins ilegais ou não autorizados e em cumprir todas as leis locais sobre conduta online.",
+        "Faremos esforços razoáveis para garantir que a plataforma esteja disponível, mas não garantimos um serviço ininterrupto ou livre de erros.",
+        "Podemos atualizar a Plataforma e seus serviços periodicamente para melhorar a funcionalidade, a segurança e a experiência do usuário.",
+        "Nós nunca venderemos seus dados pessoais, como seu nome ou endereço de e-mail, a terceiros. Nosso modelo de negócios é baseado em fornecer um serviço valioso, não em monetizar dados de usuários.",
+        "Para planos pagos, utilizamos um processador de pagamentos líder e seguro (ex: Stripe, PayPal). Seus dados financeiros são tratados com segurança por eles e nunca são armazenados em nossos servidores.",
+        "Você tem o direito de exportar seus dados a qualquer momento, sujeito aos recursos do seu plano de assinatura, permitindo controle total sobre suas informações.",
+        "Você pode cancelar sua assinatura a qualquer momento. Não impomos contratos de longo prazo ou períodos de fidelidade, proporcionando máxima flexibilidade."
+      ]
+    }
   }
 }

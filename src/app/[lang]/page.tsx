@@ -19,7 +19,8 @@ export default async function LandingPage({ params: { lang } }: Props) {
       <Header lang={lang} dictionary={{
         appName: dict.appName,
         nav: dict.nav,
-        languageSwitcher: dict.languageSwitcher
+        languageSwitcher: dict.languageSwitcher,
+        auth: dict.auth
       }} />
       <main className="flex-grow">
         <HeroSection lang={lang} dictionary={dict.hero} />
@@ -38,8 +39,3 @@ export default async function LandingPage({ params: { lang } }: Props) {
     </>
   );
 }
-
-// Placeholder pages for links in footer
-export function PrivacyPolicyPage() { return <div className="container py-10"><h1>Privacy Policy</h1><p>Content coming soon...</p></div> }
-export function TermsOfServicePage() { return <div className="container py-10"><h1>Terms of Service</h1><p>Content coming soon...</p></div> }
-// TODO: Create actual pages for /privacy-policy and /terms-of-service under [lang] route

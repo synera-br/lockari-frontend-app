@@ -1,6 +1,8 @@
 'use server';
 
 import { z } from 'zod';
+import { db } from '@/lib/firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const contactFormSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -41,29 +43,26 @@ export async function submitContactForm(
 
   const { name, email, message } = validatedFields.data;
 
-  // In a real application, you would send this data to an email service, CRM, or Firestore.
-  // For now, we'll just log it.
-  console.log('Contact form submission:');
-  console.log('Name:', name);
-  console.log('Email:', email);
-  console.log('Message:', message);
+  try {
+    const submissionsCollection = collection(db, 'contactSubmissions');
+    await addDoc(submissionsCollection, {
+      name,
+      email,
+      message,
+      submittedAt: serverTimestamp(),
+    });
+    console.log('Contact form submission saved to Firestore.');
 
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  // Simulate success
-  const success = true; // Math.random() > 0.2; // Simulate occasional errors
-
-  if (success) {
     return {
       message: 'Message sent successfully! We will get back to you soon.',
       type: 'success',
     };
-  } else {
+  } catch (error) {
+    console.error('Error saving contact submission to Firestore:', error);
     return {
       message: 'An unexpected error occurred. Please try again later.',
       type: 'error',
-      fields: { name, email, message }
+      fields: { name, email, message },
     };
   }
 }

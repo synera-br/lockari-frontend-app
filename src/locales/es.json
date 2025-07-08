@@ -1,3 +1,4 @@
+
 {
   "appName": "Lockari Vault",
   "nav": {
@@ -37,29 +38,32 @@
       "name": "Nivel Gratuito",
       "description": "Perfecto para individuos y proyectos pequeños.",
       "features": [
-        "Almacenamiento Básico de Secretos",
-        "1 Usuario",
+        "1 bóveda",
+        "10 ítems (secretos, claves, etc.)",
+        "Hasta 3 usuarios",
         "Soporte de la Comunidad"
       ],
-      "cta": "Regístrate"
+      "cta": "Regístrate Gratis"
     },
     "proTier": {
       "name": "Nivel Pro",
       "description": "Para equipos en crecimiento y empresas que necesitan más potencia.",
       "features": [
-        "Funciones Avanzadas",
-        "Múltiples Usuarios",
+        "3 bóvedas",
+        "100 ítems",
+        "Hasta 10 usuarios",
         "Soporte Prioritario"
       ],
-      "cta": "Aprende Más"
+      "cta": "Iniciar Prueba Pro"
     },
     "enterpriseTier": {
       "name": "Empresarial",
       "description": "Soluciones personalizadas para grandes organizaciones.",
       "features": [
-        "Infraestructura Dedicada",
-        "SLA",
-        "Soporte Premium"
+        "Bóvedas e ítems ilimitados",
+        "Inicio de Sesión Único (SSO)",
+        "Soporte Premium y SLA",
+        "Integraciones Personalizadas"
       ],
       "cta": "Contactar Ventas"
     }
@@ -89,5 +93,171 @@
     "en": "Inglés",
     "pt": "Portugués",
     "es": "Español"
+  },
+  "auth": {
+    "loginTitle": "Bienvenido de Nuevo",
+    "loginSubtitle": "Ingresa tus credenciales para acceder a tu bóveda.",
+    "signupTitle": "Crea Tu Cuenta",
+    "signupSubtitle": "Comienza tu viaje hacia la gestión segura de secretos.",
+    "planLabel": "Plan",
+    "emailLabel": "Correo Electrónico",
+    "emailPlaceholder": "nombre@ejemplo.com",
+    "passwordLabel": "Contraseña",
+    "nameLabel": "Nombre Completo",
+    "namePlaceholder": "Juan Pérez",
+    "confirmPasswordLabel": "Confirmar Contraseña",
+    "loginButton": "Iniciar Sesión",
+    "signupButton": "Crear Cuenta",
+    "orContinueWith": "O continuar con",
+    "loginCta": "¿Ya tienes una cuenta?",
+    "loginLink": "Iniciar Sesión",
+    "signupCta": "¿No tienes una cuenta?",
+    "signupLink": "Regístrate",
+    "signOutButton": "Cerrar Sesión",
+    "welcomeTitle": "Bienvenido",
+    "welcomeSubtitle": "Este es tu panel de control personal.",
+    "dashboardWip": "Esta área está en construcción. ¡Vuelve pronto para gestionar tus secretos!",
+    "errorInvalidCredential": "Correo electrónico o contraseña no válidos. Inténtalo de nuevo.",
+    "errorInvalidEmail": "Por favor, introduce una dirección de correo electrónico válida.",
+    "errorEmailInUse": "Este correo electrónico ya está en uso. Por favor, prueba con otro.",
+    "errorWeakPassword": "La contraseña es demasiado débil. Debe tener al menos 8 caracteres.",
+    "errorPasswordRequired": "La contraseña es obligatoria.",
+    "errorPasswordsDoNotMatch": "Las contraseñas no coinciden.",
+    "errorNameTooShort": "El nombre debe tener al menos 2 caracteres.",
+    "errorGeneric": "Ocurrió un error inesperado. Por favor, inténtalo de nuevo.",
+    "errorAccountExists": "Ya existe una cuenta con este correo electrónico utilizando un método de inicio de sesión diferente.",
+    "errorGoogleSignInFailed": "Error al iniciar sesión con Google. Comprueba la configuración de tu proyecto de Firebase e inténtalo de nuevo.",
+    "termsAgreementPrefix": "Al continuar, aceptas nuestros ",
+    "termsAgreementLink": "Términos de Servicio",
+    "termsAgreementSuffix": "."
+  },
+  "dashboard": {
+    "nav": {
+      "dashboard": "Panel",
+      "vaults": "Bóvedas",
+      "accessControl": "Control de Acceso",
+      "auditTrail": "Pista de Auditoría",
+      "account": "Cuenta"
+    },
+    "userNav": {
+      "profile": "Perfil",
+      "support": "Soporte",
+      "signOut": "Cerrar Sesión"
+    },
+    "wip": "Esta funcionalidad está en construcción. Por favor, vuelva más tarde.",
+    "supportForm": {
+      "title": "Enviar una Solicitud",
+      "description": "¿Cómo podemos ayudarte hoy? Por favor, completa el siguiente formulario.",
+      "subject": "Asunto",
+      "subjectPlaceholder": "ej: Problema al compartir la bóveda",
+      "type": "Tipo de Solicitud",
+      "typePlaceholder": "Selecciona un tipo",
+      "types": {
+        "support": "Soporte",
+        "feedback": "Comentarios",
+        "newFeature": "Solicitud de Nueva Característica"
+      },
+      "category": "Categoría",
+      "categoryPlaceholder": "Selecciona una categoría",
+      "categories": {
+        "other": "Otro"
+      },
+      "message": "Mensaje",
+      "messagePlaceholder": "Por favor, describe tu solicitud en detalle...",
+      "submit": "Enviar Solicitud",
+      "successTitle": "Solicitud Enviada",
+      "successDescription": "¡Gracias! Hemos recibido tu solicitud y te responderemos pronto.",
+      "errorTitle": "Fallo en el Envío",
+      "errorDescription": "Hubo un error al enviar tu solicitud. Por favor, inténtalo de nuevo."
+    },
+    "vaults": {
+      "title": "Mis Bóvedas",
+      "createNew": "Crear Nueva Bóveda",
+      "searchPlaceholder": "Buscar bóvedas...",
+      "backToVaults": "Volver a todas las bóvedas",
+      "emptyState": {
+        "title": "No se Encontraron Bóvedas",
+        "description": "Comienza creando tu primera bóveda para almacenar tus secretos de forma segura.",
+        "noResultsTitle": "No se Encontraron Resultados",
+        "noResultsDescription": "Tu búsqueda no coincidió con ninguna bóveda. Intenta con otro término."
+      },
+      "createDialog": {
+        "title": "Crear una Nueva Bóveda",
+        "description": "Las bóvedas son contenedores seguros para tus secretos. Dale un nombre a tu nueva bóveda para empezar.",
+        "nameLabel": "Nombre de la Bóveda",
+        "namePlaceholder": "ej: Claves de API de Producción",
+        "descriptionLabel": "Descripción (Opcional)",
+        "descriptionPlaceholder": "Una breve descripción del propósito de esta bóveda.",
+        "tagsLabel": "Etiquetas (Opcional)",
+        "tagsPlaceholder": "ej: produccion, api, backend",
+        "tagsHint": "Separa las etiquetas con una coma.",
+        "cancel": "Cancelar",
+        "submit": "Crear Bóveda"
+      },
+      "formFeedback": {
+        "successTitle": "Bóveda Creada",
+        "successDescription": "Tu nueva bóveda ha sido creada exitosamente.",
+        "errorTitle": "Creación Fallida",
+        "errorDescription": "No se pudo crear la bóveda. Por favor, inténtalo de nuevo.",
+        "validationError": "Por favor, revisa el formulario en busca de errores."
+      }
+    },
+    "stats": {
+      "totalVaults": "Bóvedas Totales",
+      "totalSecrets": "Secretos Totales",
+      "totalCertificates": "Certificados Totales",
+      "totalSshKeys": "Claves SSH Totales",
+      "viewDetails": "Ver Detalles"
+    }
+  },
+  "termsDialog": {
+    "title": "¡Bienvenido a Lockari Vault!",
+    "introduction": "Antes de comenzar, tómese un momento para revisar nuestros términos. Lockari Vault es una plataforma diseñada para almacenar y gestionar de forma segura sus secretos, claves y certificados, garantizando la protección de sus activos digitales.",
+    "securityPledge": "Estamos comprometidos con su seguridad. Todos los datos almacenados en nuestra plataforma están encriptados utilizando las mejores prácticas de la industria. Su información sensible nunca se almacena en texto plano.",
+    "agreementClause": "Al hacer clic en 'Aceptar y Continuar', usted confirma que ha leído y acepta los siguientes puntos:",
+    "items": [
+      "Usted acepta usar la plataforma y reconoce que almacenaremos sus datos de forma segura para proporcionar nuestros servicios.",
+      "Usted comprende que todos los datos sensibles están encriptados en reposo y en tránsito.",
+      "Usted es responsable de mantener la confidencialidad de la contraseña de su cuenta.",
+      "Usted se compromete a no utilizar la plataforma para ningún propósito ilegal o no autorizado.",
+      "Haremos esfuerzos razonables para asegurar la disponibilidad de la plataforma, pero no garantizamos un servicio ininterrumpido.",
+      "Podemos actualizar la plataforma y sus servicios de vez en cuando para mejorar la funcionalidad y la seguridad.",
+      "Nunca venderemos sus datos personales, como su dirección de correo electrónico, a terceros.",
+      "Para los planes de pago, utilizamos un procesador de pagos líder y seguro. Los detalles de su tarjeta nunca se almacenan en nuestros servidores.",
+      "Puede exportar sus datos en cualquier momento, sujeto a las características de su plan.",
+      "Puede cancelar su suscripción en cualquier momento. No hay contratos a largo plazo ni períodos de permanencia."
+    ],
+    "acceptButton": "Aceptar y Continuar"
+  },
+  "termsPage": {
+    "title": "Términos de Servicio",
+    "lastUpdated": "Última actualización: 17 de mayo de 2024",
+    "introduction": "Bienvenido a Lockari Vault. Estos Términos de Servicio ('Términos') rigen su acceso y uso de los servicios, sitio web y aplicaciones de Lockari Vault (colectivamente, la 'Plataforma'). Al utilizar la Plataforma, usted acepta estar sujeto a estos Términos.",
+    "sections": [
+      {
+        "title": "1. Introducción a la Plataforma",
+        "content": "Lockari Vault proporciona un entorno seguro para gestionar secretos digitales, incluyendo, entre otros, claves de API, contraseñas, certificados y claves SSH. Nuestro objetivo es ofrecer un servicio fiable y seguro siguiendo las mejores prácticas del mercado en ciberseguridad."
+      },
+      {
+        "title": "2. Seguridad y Cifrado de Datos",
+        "content": "Estamos comprometidos con la seguridad de sus datos. Toda la información que almacena en la Plataforma se cifra en reposo y en tránsito utilizando protocolos de cifrado robustos. Los datos sensibles nunca se almacenan en formato de texto plano, garantizando que solo usted pueda acceder a sus secretos."
+      }
+    ],
+    "agreement": {
+      "title": "3. Acuerdo de Usuario",
+      "description": "Al crear una cuenta y utilizar la Plataforma, usted reconoce y acepta los siguientes puntos:",
+      "items": [
+        "Usted acepta usar la plataforma y es consciente de que almacenamos sus datos de forma segura para proporcionar nuestros servicios.",
+        "Usted comprende que todos los datos sensibles están cifrados en reposo y en tránsito, y nunca se almacenan en texto plano.",
+        "Usted es responsable de mantener la confidencialidad de la contraseña de su cuenta y de todas las actividades que ocurran bajo su cuenta.",
+        "Usted se compromete a no utilizar la Plataforma para ningún fin ilegal o no autorizado y a cumplir con todas las leyes locales sobre conducta en línea.",
+        "Haremos esfuerzos razonables para asegurar que la plataforma esté disponible, pero no garantizamos un servicio ininterrumpido o libre de errores.",
+        "Podemos actualizar la Plataforma y sus servicios de vez en cuando para mejorar la funcionalidad, la seguridad y la experiencia del usuario.",
+        "Nunca venderemos sus datos personales, como su nombre o dirección de correo electrónico, a terceros. Nuestro modelo de negocio se basa en proporcionar un servicio valioso, no en monetizar los datos de los usuarios.",
+        "Para los planes de pago, utilizamos un procesador de pagos líder y seguro (por ejemplo, Stripe, PayPal). Sus datos financieros son gestionados de forma segura por ellos y nunca se almacenan en nuestros servidores.",
+        "Usted tiene derecho a exportar sus datos en cualquier momento, sujeto a las características de su plan de suscripción, lo que le permite un control total sobre su información.",
+        "Puede cancelar su suscripción en cualquier momento. No aplicamos contratos a largo plazo ni períodos de permanencia, ofreciéndole la máxima flexibilidad."
+      ]
+    }
   }
 }

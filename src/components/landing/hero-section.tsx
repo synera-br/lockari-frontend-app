@@ -25,7 +25,7 @@ export default function HeroSection({ lang, dictionary }: HeroSectionProps) {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <Button asChild size="lg" className="font-semibold shadow-lg hover:shadow-xl transition-shadow duration-300">
-            <Link href={`/${lang}/auth/signup`}> {/* Placeholder link */}
+            <Link href={`/${lang}/auth/signup`}>
               {dictionary.cta}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>

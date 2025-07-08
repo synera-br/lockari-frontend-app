@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { match } from '@formatjs/intl-localematcher';
 import Negotiator from 'negotiator';
@@ -23,25 +24,29 @@ function getLocale(request: NextRequest): Locale {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const pathnameIsMissingLocale = locales.every(
-    (locale) => !pathname.startsWith(`/${locale}/`) && pathname !== `/${locale}`
+  // Check if there is any supported locale in the pathname
+  const pathnameHasLocale = locales.some(
+    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
   );
 
-  if (pathnameIsMissingLocale) {
-    const locale = getLocale(request);
-    return NextResponse.redirect(
-      new URL(`/${locale}${pathname.startsWith('/') ? '' : '/'}${pathname}`, request.url)
-    );
+  if (pathnameHasLocale) {
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  // Redirect if there is no locale
+  const locale = getLocale(request);
+  
+  // Prepend the locale to the path, handling the root path case
+  request.nextUrl.pathname = `/${locale}${pathname === '/' ? '' : pathname}`;
+
+  // e.g. incoming request is /products
+  // The new URL is now /en/products
+  return Response.redirect(request.nextUrl);
 }
 
 export const config = {
   matcher: [
-    // Skip all internal paths (_next)
-    '/((?!_next|api|favicon.ico|images|.*\\..*).*)',
-    // Optional: only run on root (/) URL
-    // '/'
+    // Skip all internal paths (_next) and API routes (api)
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

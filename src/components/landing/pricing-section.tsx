@@ -24,7 +24,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       period: '/month',
       features: dictionary.freeTier.features,
       cta: dictionary.freeTier.cta,
-      href: `/${lang}/auth/signup`, // Placeholder
+      href: `/${lang}/auth/signup?plan=free`,
       variant: 'outline' as const,
     },
     {
@@ -34,7 +34,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       period: '',
       features: dictionary.proTier.features,
       cta: dictionary.proTier.cta,
-      href: `/${lang}#contact`, // Placeholder
+      href: `/${lang}/auth/signup?plan=pro`,
       variant: 'default' as const,
       popular: true,
     },
@@ -45,7 +45,7 @@ export default function PricingSection({ lang, dictionary }: PricingSectionProps
       period: '',
       features: dictionary.enterpriseTier.features,
       cta: dictionary.enterpriseTier.cta,
-      href: `/${lang}#contact`, // Placeholder
+      href: `/${lang}#contact`,
       variant: 'outline' as const,
     },
   ];

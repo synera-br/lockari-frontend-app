@@ -2,8 +2,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useActionState } from 'react'; // Changed from 'react-dom'
-import { useFormStatus } from 'react-dom';
+import { useFormState, useFormStatus } from 'react-dom';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,17 +42,17 @@ function SubmitButton({ label }: { label: string }) {
 }
 
 export default function ContactForm({ dictionary }: ContactFormProps) {
-  const [state, formAction] = useActionState(submitContactForm, initialState); // Renamed useFormState to useActionState
+  const [state, formAction] = useFormState(submitContactForm, initialState);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (state.type === 'success') {
+    if (state?.type === 'success') {
       toast({
         title: 'Success!',
         description: dictionary.success, // Use dynamic success message from dictionary
       });
       // Optionally reset form here if you manage form fields with React state
-    } else if (state.type === 'error') {
+    } else if (state?.type === 'error') {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -83,11 +82,11 @@ export default function ContactForm({ dictionary }: ContactFormProps) {
               name="name"
               placeholder={dictionary.namePlaceholder}
               className="mt-1"
-              defaultValue={state.fields?.name}
+              defaultValue={state?.fields?.name}
               aria-describedby="name-error"
               required
             />
-            {state.issues?.find(issue => issue.toLowerCase().includes('name')) && (
+            {state?.issues?.find(issue => issue.toLowerCase().includes('name')) && (
                  <p id="name-error" className="text-sm text-destructive mt-1">{state.issues.find(issue => issue.toLowerCase().includes('name'))}</p>
             )}
           </div>
@@ -99,11 +98,11 @@ export default function ContactForm({ dictionary }: ContactFormProps) {
               name="email"
               placeholder={dictionary.emailPlaceholder}
               className="mt-1"
-              defaultValue={state.fields?.email}
+              defaultValue={state?.fields?.email}
               aria-describedby="email-error"
               required
             />
-             {state.issues?.find(issue => issue.toLowerCase().includes('email')) && (
+             {state?.issues?.find(issue => issue.toLowerCase().includes('email')) && (
                  <p id="email-error" className="text-sm text-destructive mt-1">{state.issues.find(issue => issue.toLowerCase().includes('email'))}</p>
             )}
           </div>
@@ -115,18 +114,18 @@ export default function ContactForm({ dictionary }: ContactFormProps) {
               rows={5}
               placeholder={dictionary.messagePlaceholder}
               className="mt-1"
-              defaultValue={state.fields?.message}
+              defaultValue={state?.fields?.message}
               aria-describedby="message-error"
               required
             />
-            {state.issues?.find(issue => issue.toLowerCase().includes('message')) && (
+            {state?.issues?.find(issue => issue.toLowerCase().includes('message')) && (
                  <p id="message-error" className="text-sm text-destructive mt-1">{state.issues.find(issue => issue.toLowerCase().includes('message'))}</p>
             )}
           </div>
           <div className="flex justify-end">
             <SubmitButton label={dictionary.submit} />
           </div>
-           {state.message && !state.issues && state.type === 'error' && (
+           {state?.message && !state?.issues && state?.type === 'error' && (
             <p className="text-sm text-destructive mt-2">{state.message}</p>
           )}
         </form>

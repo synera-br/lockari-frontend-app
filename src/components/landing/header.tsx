@@ -19,6 +19,10 @@ interface HeaderProps {
       pt: string;
       es: string;
     };
+    auth: {
+      loginLink: string;
+      signupLink: string;
+    };
   };
 }
 
@@ -47,8 +51,16 @@ export default function Header({ lang, dictionary }: HeaderProps) {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
           <LanguageSwitcher currentLocale={lang} dictionary={dictionary.languageSwitcher} />
+          <div className="hidden items-center space-x-2 md:flex">
+            <Button asChild variant="ghost">
+              <Link href={`/${lang}/auth/login`}>{dictionary.auth.loginLink}</Link>
+            </Button>
+            <Button asChild>
+              <Link href={`/${lang}/auth/signup`}>{dictionary.auth.signupLink}</Link>
+            </Button>
+          </div>
           {/* Mobile Menu Trigger (optional, can be added later) */}
         </div>
       </div>
