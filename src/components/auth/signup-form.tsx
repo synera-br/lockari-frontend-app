@@ -74,11 +74,13 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
     setLoading(true);
     setError(null);
     try {
+      // Step 1: Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       
+      // Step 2: Update user profile with name
       await updateProfile(userCredential.user, { displayName: data.name });
       
-      // Create user profile in Firestore
+      // Step 3: Create user document in Firestore
       await setDoc(doc(db, "users", userCredential.user.uid), {
         uid: userCredential.user.uid,
         name: data.name,
@@ -90,7 +92,8 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         authProvider: 'email',
       });
 
-      // Notify backend to create the tenant. This is a mandatory step.
+      // Step 4: Notify backend to create tenant. This is a mandatory step.
+      console.log('User created in Firebase. Notifying backend to create tenant...');
       const auditResult = await auditAuthEvent({
         eventType: 'SIGNUP_SUCCESS',
         user: {
@@ -101,18 +104,23 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         }
       });
 
-      // If backend tenant creation fails, roll back user creation.
+      // Step 5: Handle backend response (Rollback or Success)
       if (!auditResult.success) {
+        // This is the critical rollback step if backend fails
+        console.error('Backend tenant creation failed. Rolling back Firebase user...');
         try {
           await userCredential.user.delete();
+          console.log('Firebase user rolled back successfully.');
         } catch (deleteError) {
-          console.error("Failed to roll back user creation:", deleteError);
+          console.error("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
         }
+        // Display the specific error from the backend call
         setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
-        setLoading(false);
+        setLoading(false); // Stop loading indicator on failure
         return; 
       }
       
+      console.log('Backend tenant created successfully. Redirecting to dashboard.');
       router.push(`/${lang}/dashboard`);
 
     } catch (e) {
