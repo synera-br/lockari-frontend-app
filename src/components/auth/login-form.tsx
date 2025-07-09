@@ -7,13 +7,12 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { signInWithEmailAndPassword, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { auth, db } from '@/lib/firebase/config';
+import { auth } from '@/lib/firebase/config';
 import { auditAuthEvent } from '@/app/actions/auth';
 import type { Locale } from '@/middleware';
 import { Github, Loader2 } from 'lucide-react';
@@ -81,6 +80,7 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
       const authError = e as AuthError;
       debugError("Firebase Login Error:", authError);
       setError(getFirebaseErrorMessage(authError.code));
+    } finally {
       setLoading(false);
     }
   };
@@ -94,21 +94,10 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
       const result = await signInWithPopup(auth, provider);
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
       
+      // The backend will handle creating the Firestore user document based on the audit event.
+      // The frontend's responsibility is to report the event.
       if (isNewUser) {
-        // This is a new user signing up via Google on the login page.
-        // Create user profile in Firestore
-        await setDoc(doc(db, "users", result.user.uid), {
-            uid: result.user.uid,
-            name: result.user.displayName,
-            email: result.user.email,
-            plan: 'free', // Default plan for social sign-ups
-            termsAccepted: false,
-            termsVersion: 0,
-            createdAt: serverTimestamp(),
-            authProvider: 'google',
-        });
-        
-        // Notify backend to create the tenant. This is a mandatory step.
+        // This is a new user signing up. Notify backend to create tenant and profile.
         const auditResult = await auditAuthEvent({
           eventType: 'SIGNUP_SUCCESS',
           user: {
@@ -119,7 +108,7 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
           }
         });
 
-        // If backend tenant creation fails, roll back user creation.
+        // If backend tenant creation fails, roll back user creation in Auth.
         if (!auditResult.success) {
           debugError('Google login signup backend audit failed:', auditResult.message);
           try {
@@ -134,24 +123,8 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
         }
 
       } else {
-        // This is a returning user.
-        // Backfill profile for existing Google users if it doesn't exist in Firestore.
-        const userDocRef = doc(db, 'users', result.user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-            uid: result.user.uid,
-            name: result.user.displayName,
-            email: result.user.email,
-            plan: 'free', // Assume free plan for backfill
-            termsAccepted: false, // Force them to accept terms
-            termsVersion: 0,
-            createdAt: serverTimestamp(),
-            authProvider: 'google',
-          });
-        }
-        
-        // Audit the login event.
+        // This is a returning user. Just audit the login event.
+        // The backend can use this event to ensure a profile exists, if needed.
         await auditAuthEvent({
           eventType: 'LOGIN_SUCCESS',
           user: {
@@ -176,6 +149,7 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
           setError(dictionary.errorGoogleSignInFailed);
           debugError("Google Sign-In Error:", authError);
       }
+    } finally {
       setLoading(false);
     }
   };

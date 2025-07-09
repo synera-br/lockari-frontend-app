@@ -7,14 +7,12 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword, updateProfile, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, type UserCredential } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { auth, db } from '@/lib/firebase/config';
+import { auth } from '@/lib/firebase/config';
 import { auditAuthEvent } from '@/app/actions/auth';
 import type { Locale } from '@/middleware';
 import { Github, Loader2 } from 'lucide-react';
@@ -83,20 +81,9 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       // Step 2: Update user profile with name
       await updateProfile(userCredential.user, { displayName: data.name });
       
-      // Step 3: Create user document in Firestore
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        name: data.name,
-        email: data.email,
-        plan: data.plan,
-        termsAccepted: false,
-        termsVersion: 0,
-        createdAt: serverTimestamp(),
-        authProvider: 'email',
-      });
-
-      // Step 4: Notify backend to create tenant. This is a mandatory step.
-      debugLog(`User ${userCredential.user.uid} created in Firebase. Notifying backend to create tenant...`);
+      // Step 3: Notify backend to create tenant and user profile in Firestore.
+      // The frontend is no longer responsible for writing to Firestore.
+      debugLog(`User ${userCredential.user.uid} created in Firebase Auth. Notifying backend...`);
       debugTime('Backend Audit Request');
       const auditResult = await auditAuthEvent({
         eventType: 'SIGNUP_SUCCESS',
@@ -107,36 +94,35 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           plan: data.plan
         }
       });
-
       debugTimeEnd('Backend Audit Request');
-      // Step 5: Handle backend response. If it fails, throw an error to trigger the catch block for rollback.
+      
+      // Step 4: Handle backend response. If it fails, throw an error to trigger the catch block for rollback.
       if (!auditResult.success) {
         debugError('Backend audit failed:', auditResult.message);
         throw new Error(auditResult.message || 'Failed to create your account on our servers. Please try again.');
       }
       
-      debugLog('Backend tenant created successfully. Redirecting to dashboard...');
+      debugLog('Backend processing successful. Redirecting to dashboard...');
       router.push(`/${lang}/dashboard`);
 
     } catch (e: any) {
-      // This block catches errors from Firebase Auth AND our custom thrown error from the audit.
+      // This block catches errors from Firebase Auth OR our custom thrown error from the audit.
       
-      // First, perform rollback if a user was successfully created before the error.
+      // First, perform rollback if a user was successfully created in Auth before the error.
       if (userCredential) {
-        debugError('An error occurred after user creation. Rolling back Firebase user...');
+        debugError('An error occurred after user creation in Auth. Rolling back...');
         try {
           await userCredential.user.delete();
           debugLog('Firebase user rolled back successfully.');
         } catch (deleteError) {
           debugError("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
-          // Even if rollback fails, we must inform the user about the original error.
         }
       }
 
       // Determine the error message to display
       let errorMessage: string;
       if (e instanceof Error && (e.message.includes('Failed to create') || e.message.includes('timed out'))) {
-        // This is our custom error from the failed audit or a timeout.
+        // This is our custom error from a failed backend call.
         errorMessage = e.message;
       } else {
         // This is likely a Firebase Auth error
@@ -146,7 +132,8 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       }
       
       setError(errorMessage);
-      setLoading(false); // Ensure loading is stopped on any failure.
+    } finally {
+        setLoading(false); // Ensure loading is stopped on any failure path.
     }
   };
 
@@ -160,19 +147,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
       
       if (isNewUser) {
-        // Create user profile in Firestore for new Google user
-        await setDoc(doc(db, "users", result.user.uid), {
-            uid: result.user.uid,
-            name: result.user.displayName,
-            email: result.user.email,
-            plan: 'free', // Default plan
-            termsAccepted: false,
-            termsVersion: 0,
-            createdAt: serverTimestamp(),
-            authProvider: 'google',
-        });
-        
-        // Notify backend to create the tenant. This is a mandatory step.
+        // New user via Google. Notify backend to create tenant and profile.
         const auditResult = await auditAuthEvent({
           eventType: 'SIGNUP_SUCCESS',
           user: {
@@ -183,7 +158,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           }
         });
 
-        // If backend tenant creation fails, roll back user creation.
+        // If backend tenant creation fails, roll back user creation in Auth.
         if (!auditResult.success) {
             debugError('Google signup backend audit failed:', auditResult.message);
             try {
@@ -198,7 +173,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         }
 
       } else {
-        // This is a login, not a signup. The login form handles profile backfilling.
+        // This is a login, not a signup. Just audit the login event.
         await auditAuthEvent({
           eventType: 'LOGIN_SUCCESS',
           user: {
@@ -214,18 +189,17 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       switch (authError.code) {
         case 'auth/popup-closed-by-user':
           // User closed the popup, do nothing.
-          setLoading(false);
           break;
         case 'auth/account-exists-with-different-credential':
           setError(dictionary.errorAccountExists);
-          setLoading(false);
           break;
         default:
            // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
           setError(dictionary.errorGoogleSignInFailed);
           debugError("Google Sign-In Error:", authError);
-          setLoading(false);
       }
+    } finally {
+        setLoading(false);
     }
   };
 

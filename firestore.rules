@@ -1,37 +1,12 @@
+
 rules_version = '2';
 
+// Lock down Firestore rules to deny all client-side access.
+// All data access MUST go through the backend Go services, which use the Admin SDK
+// and bypass these rules. This is the correct security model for this architecture.
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users Collection
-    // - Allows a user to create their own user document during signup.
-    // - Allows an authenticated user to read or update their own document.
-    match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      // Deletion is intentionally disallowed from the client-side for data integrity.
-      allow delete: if false;
-    }
-
-    // Contact Submissions Collection
-    // - Allows anyone to create (submit) a contact form.
-    // - Denies all reads, updates, and deletes from the client-side for security.
-    match /contactSubmissions/{docId} {
-      allow create: if true;
-      allow read, update, delete: if false;
-    }
-    
-    // Support Submissions Collection
-    // - Allows any authenticated user to create a support ticket.
-    // - Denies all reads, updates, and deletes from the client-side for security.
-    match /supportSubmissions/{docId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if false;
-    }
-
-    // Default Deny Rule (Good Practice)
-    // This explicitly denies access to any other collections not defined above.
-    // If you add a new collection in the future, you must add rules for it here.
+    // Deny all reads and writes to all collections.
     match /{document=**} {
       allow read, write: if false;
     }

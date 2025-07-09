@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useAuth } from '@/hooks/use-auth';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, type ReactNode } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -20,11 +19,10 @@ import { ShieldIcon, LayoutDashboard, Loader2, Vault, Users, History, UserCog } 
 import type { Locale } from '@/middleware';
 import type { Dictionary } from '@/dictionaries';
 import { UserNav } from '@/components/dashboard/user-nav';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/config';
-import { TermsDialog } from '@/components/auth/terms-dialog';
-import { acceptUserTerms } from '@/app/actions/user';
-import { useToast } from '@/hooks/use-toast';
+// TODO: Re-implement terms acceptance logic via backend/claims
+// import { TermsDialog } from '@/components/auth/terms-dialog';
+// import { acceptUserTerms } from '@/app/actions/user';
+// import { useToast } from '@/hooks/use-toast';
 
 interface DashboardLayoutClientProps {
   children: ReactNode;
@@ -37,69 +35,22 @@ export default function DashboardClient({ children, lang, dictionary, currentTer
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
+  // const { toast } = useToast();
 
-  const [hasCheckedTerms, setHasCheckedTerms] = useState(false);
-  const [showTermsDialog, setShowTermsDialog] = useState(false);
-  const [isAcceptingTerms, setIsAcceptingTerms] = useState(false);
+  // TODO: The logic for checking and accepting terms has been temporarily disabled
+  // because it relied on direct Firestore access, which is now correctly blocked by security rules.
+  // This needs to be re-implemented by:
+  // 1. Having the backend add a `termsVersion` custom claim to the user's ID token.
+  // 2. Reading this claim from the `useAuth()` hook.
+  // 3. Creating a backend endpoint for the `acceptUserTerms` action.
 
   useEffect(() => {
-    // If auth has finished loading...
-    if (!authLoading) {
-      if (!user) {
-        // ...and there's no user, redirect to login.
-        router.push(`/${lang}/auth/login`);
-      } else if (user && !hasCheckedTerms) {
-        // ...and there is a user, and we haven't checked terms yet, then perform the check.
-        const checkTerms = async () => {
-          setHasCheckedTerms(true); // Mark as checked to prevent re-running the check.
-          try {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              const acceptedVersion = userData.termsVersion || 0;
-              if (!userData.termsAccepted || acceptedVersion < currentTermsVersion) {
-                setShowTermsDialog(true);
-              }
-            } else {
-              // This case might happen if a user was created in Auth but not in Firestore.
-              // Forcing acceptance is a safe default.
-              setShowTermsDialog(true);
-            }
-          } catch (error) {
-            console.error("Failed to check user terms:", error);
-            toast({
-              variant: 'destructive',
-              title: 'Error',
-              description: 'Failed to check your account status. Please try again.',
-            });
-          }
-        };
-        checkTerms();
-      }
+    if (!authLoading && !user) {
+      router.push(`/${lang}/auth/login`);
     }
-  }, [user, authLoading, hasCheckedTerms, lang, router, toast, currentTermsVersion]);
-  
-  const handleAcceptTerms = async () => {
-    if (!user) return;
-    setIsAcceptingTerms(true);
-    const result = await acceptUserTerms(user.uid);
-    if (result.success) {
-      setShowTermsDialog(false);
-    } else {
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: result.message || 'Could not save your acceptance. Please try again.',
-        });
-    }
-    setIsAcceptingTerms(false);
-  };
+  }, [user, authLoading, lang, router]);
 
-  // The main loading state now ONLY depends on authentication.
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -107,24 +58,13 @@ export default function DashboardClient({ children, lang, dictionary, currentTer
       </div>
     );
   }
-
-  // If auth is done but there is no user, we render nothing while the redirect happens.
-  if (!user) {
-    return null;
-  }
   
   const dashboardDict = dictionary.dashboard;
   const navDict = dashboardDict.nav;
 
-  // The dashboard is rendered immediately after auth. The TermsDialog will appear on top if needed.
   return (
     <SidebarProvider>
-      <TermsDialog 
-        isOpen={showTermsDialog} 
-        dictionary={dictionary.termsDialog}
-        onAccept={handleAcceptTerms}
-        isAccepting={isAcceptingTerms}
-      />
+      {/* <TermsDialog ... /> */}
       <Sidebar>
         <SidebarHeader>
           <Link href={`/${lang}/dashboard`} className="flex items-center gap-2">
