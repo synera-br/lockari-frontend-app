@@ -44,9 +44,8 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Backend URL and Token
+// Backend URL
 export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-export const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN;
 
 
 export { app, auth, db };

@@ -3,7 +3,7 @@
 
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
-import { BACKEND_URL, BACKEND_API_TOKEN } from '@/lib/firebase/config';
+import { BACKEND_URL } from '@/lib/firebase/config';
 import { debugError, debugWarn, debugLog, isDebugMode } from '@/lib/debug';
 
 const APP_NAME = 'LockariVaultApp';
@@ -130,8 +130,9 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   const headers = new Headers(options.headers || {});
   
   // Static token for authorizing the frontend application with the backend.
-  if (BACKEND_API_TOKEN) {
-    headers.set('X-TOKEN', BACKEND_API_TOKEN);
+  // This MUST match the key used for encryption, as the backend uses it for decryption.
+  if (SHARED_SECRET_BASE64) {
+    headers.set('X-TOKEN', SHARED_SECRET_BASE64);
   }
   
   // User-specific token for authenticating the user.
