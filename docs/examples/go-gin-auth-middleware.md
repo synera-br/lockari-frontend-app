@@ -156,14 +156,14 @@ func handleUserSignup(signupService services.SignupService) gin.HandlerFunc {
         }
 
         // 3. AUTHORIZATION: Ensure the user making the request is the same user in the payload.
-        // This prevents one user from creating a tenant for another user.
+        // This is the handler's responsibility. It prevents one user from creating a tenant for another.
         if callerUID != signupEvent.GetUser().Uid {
              c.JSON(http.StatusForbidden, gin.H{"error": "Caller is not authorized to perform this action for the specified user"})
             return
         }
 
         // 4. Call the service layer with the validated data.
-        // The service layer no longer needs to worry about auth tokens, just business logic.
+        // The service layer no longer needs to worry about auth tokens or authorization, just business logic.
         createdTenant, err := signupService.Create(c.Request.Context(), signupEvent)
         if err != nil {
             // The service should return specific errors that can be mapped to HTTP statuses.
@@ -181,10 +181,13 @@ func handleUserSignup(signupService services.SignupService) gin.HandlerFunc {
 func handleListVaults(vaultService services.VaultService) gin.HandlerFunc {
     return func(c *gin.Context) {
         // 1. Retrieve the user and tenant ID from the context.
-        // We can be sure these values exist and are valid because the middleware passed.
+        // We can be sure these values exist because the middleware passed.
         userID := c.GetString(string(middleware.UserIDContextKey))
         tenantID := c.GetString(string(middleware.TenantIDContextKey))
 
+        // It's a good practice to check if a tenantID exists.
+        // For a new user, this claim might not be set on their very first token.
+        // While our signup flow sets it, this check makes the endpoint more robust.
         if tenantID == "" {
              c.JSON(http.StatusForbidden, gin.H{"error": "User is not associated with a tenant"})
              return
