@@ -113,6 +113,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         return; 
       }
       
+      setLoading(false);
       router.push(`/${lang}/dashboard`);
 
     } catch (e) {
@@ -179,22 +180,25 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         });
       }
       
+      setLoading(false);
       router.push(`/${lang}/dashboard`);
     } catch (e) {
       const authError = e as AuthError;
       switch (authError.code) {
         case 'auth/popup-closed-by-user':
           // User closed the popup, do nothing.
+          setLoading(false);
           break;
         case 'auth/account-exists-with-different-credential':
           setError(dictionary.errorAccountExists);
+          setLoading(false);
           break;
         default:
            // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
           setError(dictionary.errorGoogleSignInFailed);
           console.error("Google Sign-In Error:", authError);
+          setLoading(false);
       }
-      setLoading(false);
     }
   };
 
