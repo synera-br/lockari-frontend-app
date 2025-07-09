@@ -98,7 +98,7 @@ func AuthMiddleware(authenticator auth.Authenticator) gin.HandlerFunc {
 
 ### How to Use the Middleware
 
-You would apply this middleware to your Gin router for all routes that require authentication.
+You would apply this middleware to your Gin router for all routes that require authentication. The following example demonstrates the complete flow from middleware to handler to service.
 
 ```go
 package main
@@ -111,17 +111,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"your-project/auth"
 	"your-project/middleware"
+    "your-project/services" // Assume you have a services package
 )
 
 func main() {
-	// Initialize Firebase Authenticator
+	// Initialize Firebase Authenticator, services, etc.
     ctx := context.Background()
-	authenticator, err := auth.InitializeAuth(ctx, &auth.FirebaseConfig{
-        // ... your config here
-    })
-	if err != nil {
-		log.Fatalf("Failed to initialize authenticator: %v", err)
-	}
+	authenticator, err := auth.InitializeAuth(ctx, &auth.FirebaseConfig{ /* ... */ })
+	if err != nil { /* ... */ }
+    
+    vaultService := services.NewVaultService(/* ... */)
 
 	router := gin.Default()
 
@@ -136,8 +135,7 @@ func main() {
 	v1.Use(middleware.AuthMiddleware(authenticator))
 	{
 		// All handlers defined here are now protected.
-		v1.GET("/vaults", handleListVaults)
-		v1.POST("/vaults", handleCreateVault)
+		v1.GET("/vaults", handleListVaults(vaultService))
 		// ... other routes
 	}
 
@@ -145,24 +143,44 @@ func main() {
 }
 
 // handleListVaults is an example of a protected handler.
-func handleListVaults(c *gin.Context) {
-	// Retrieve the user and tenant ID from the context.
-	// We can be sure these values exist and are valid because the middleware passed.
-	
-    // We use c.GetString() which is convenient. It returns an empty string if the key doesn't exist.
-    // For critical data like this, you could also use c.Get() and a type assertion for more safety.
-	userID := c.GetString(string(middleware.UserIDContextKey))
-	tenantID := c.GetString(string(middleware.TenantIDContextKey))
+// It receives the vaultService as a dependency (Dependency Injection).
+func handleListVaults(vaultService services.VaultService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // 1. Retrieve the user and tenant ID from the context.
+        // We can be sure these values exist and are valid because the middleware passed.
+        
+        // We use c.GetString() which is convenient. It returns an empty string if the key doesn't exist.
+        // For critical data like this, you could also use c.Get() and a type assertion for more safety.
+        userID := c.GetString(string(middleware.UserIDContextKey))
+        tenantID := c.GetString(string(middleware.TenantIDContextKey))
 
-	// Now, use userID and tenantID to fetch data from Firestore,
-	// perform OpenFGA checks, etc.
-	log.Printf("Handler: Fetching vaults for user %s in tenant %s", userID, tenantID)
+        // 2. Call the service layer, passing the request context and the necessary data.
+        // The handler's job is to orchestrate, not to contain business logic.
+        // Notice we pass c.Request.Context(), which carries timeouts, cancellations, and our values.
+        vaults, err := vaultService.ListVaultsForUser(c.Request.Context(), userID, tenantID)
+        if err != nil {
+            // The service layer should return appropriate errors.
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not retrieve vaults"})
+            return
+        }
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "Here are the vaults for your tenant",
-		"userID":   userID,
-		"tenantID": tenantID,
-	})
+        // 3. Return the successful response.
+        c.JSON(http.StatusOK, gin.H{"vaults": vaults})
+    }
 }
+
+/*
+// --- Example Service Method (in your services package) ---
+//
+// func (s *vaultService) ListVaultsForUser(ctx context.Context, userID, tenantID string) ([]Vault, error) {
+//     // Now, use userID and tenantID to:
+//     // 1. Perform OpenFGA checks to see what the user is allowed to view.
+//     // 2. Call the repository to fetch data from Firestore, e.g., from the path `/tenants/{tenantID}/vaults`.
+//     log.Printf("Service: Fetching vaults for user %s in tenant %s", userID, tenantID)
+//     
+//     // ... repository call ...
+//     return vaults, nil
+// }
+*/
 ```
-This approach is clean, secure, and highly scalable for building out your Go backend.
+This layered approach is clean, secure, and highly scalable for building out your Go backend. The `handler` translates HTTP, and the `service` executes business logic, keeping concerns neatly separated.
