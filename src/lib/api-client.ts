@@ -4,7 +4,7 @@
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
 import { BACKEND_URL, BACKEND_API_TOKEN } from '@/lib/firebase/config';
-import { debugError, debugWarn } from '@/lib/debug';
+import { debugError, debugWarn, debugLog, isDebugMode } from '@/lib/debug';
 
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
@@ -31,6 +31,11 @@ if (!SHARED_SECRET_BASE64) {
     } catch (e) {
         debugError("Failed to parse the Base64 encryption key from NEXT_PUBLIC_ENCRYPTION_KEY. Please ensure it is a valid Base64 string.", e);
     }
+}
+
+// Add a debug log to show which key is being used in develop mode
+if (isDebugMode()) {
+    debugLog(`API Client Initialized. Using encryption key (Base64): ${SHARED_SECRET_BASE64 ? SHARED_SECRET_BASE64.substring(0, 8) + '...' : 'Default Dev Key'}`);
 }
 
 
@@ -148,6 +153,13 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
     try {
       const originalBody = typeof newOptions.body === 'string' ? JSON.parse(newOptions.body) : newOptions.body;
       const encryptedPayloadString = encryptData(originalBody);
+
+      if (isDebugMode()) {
+        debugLog('APIClient: Encrypting request for', url);
+        debugLog('APIClient: Original Body:', originalBody);
+        debugLog('APIClient: Encrypted Payload (Base64):', encryptedPayloadString);
+      }
+
       newOptions.body = JSON.stringify({ payload: encryptedPayloadString });
       headers.set('Content-Type', 'application/json'); 
     } catch (error) {
