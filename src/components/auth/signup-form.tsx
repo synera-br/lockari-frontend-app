@@ -113,7 +113,6 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         return; 
       }
       
-      setLoading(false);
       router.push(`/${lang}/dashboard`);
 
     } catch (e) {
@@ -180,7 +179,6 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         });
       }
       
-      setLoading(false);
       router.push(`/${lang}/dashboard`);
     } catch (e) {
       const authError = e as AuthError;
