@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signInWithEmailAndPassword, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, type User } from 'firebase/auth';
+import { signInWithEmailAndPassword, type AuthError, GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
