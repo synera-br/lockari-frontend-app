@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -94,10 +95,10 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
       const result = await signInWithPopup(auth, provider);
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
       
-      // The backend will handle creating the Firestore user document based on the audit event.
-      // The frontend's responsibility is to report the event.
       if (isNewUser) {
-        // This is a new user signing up. Notify backend to create tenant and profile.
+        // A new account was created via the login page.
+        // We need to notify the backend to create the associated tenant.
+        debugLog('Google Sign-In: New user detected, performing signup audit...');
         const auditResult = await auditAuthEvent({
           eventType: 'SIGNUP_SUCCESS',
           user: {
@@ -108,32 +109,39 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
           }
         });
 
-        // If backend tenant creation fails, roll back user creation in Auth.
+        // PER USER REQUEST: Do NOT delete the user on backend failure.
+        // Instead, inform them about the partial success.
         if (!auditResult.success) {
-          debugError('Google login signup backend audit failed:', auditResult.message);
-          try {
-            await result.user.delete();
-            debugLog('Google user rolled back successfully.');
-          } catch (deleteError) {
-            debugError("Failed to roll back Google user creation:", deleteError);
-          }
-          setError(auditResult.message || 'Failed to register your account. Please try again.');
+          debugError('Google login/signup backend audit failed:', auditResult.message);
+          setError(dictionary.errorPartialSignup || 'Your account was created, but the final setup failed. Please contact support.');
           setLoading(false);
-          return;
+          return; // Stop execution, user stays on login page.
         }
+        
+        debugLog('Google Sign-In: Backend tenant creation successful.');
 
       } else {
-        // This is a returning user. Just audit the login event.
-        // The backend can use this event to ensure a profile exists, if needed.
-        await auditAuthEvent({
+        // This is a returning user. We audit the login event.
+        debugLog('Google Sign-In: Existing user detected, performing login audit...');
+        const auditResult = await auditAuthEvent({
           eventType: 'LOGIN_SUCCESS',
           user: {
             uid: result.user.uid,
             email: result.user.email,
           }
         });
+        
+        // If auditing the login fails, we should prevent the user from proceeding
+        // as some backend state might be inconsistent.
+        if (!auditResult.success) {
+            debugError('Google login backend audit failed:', auditResult.message);
+            setError(dictionary.errorBackendLoginFailed || 'Could not verify your session with our servers. Please try again.');
+            setLoading(false);
+            return; // Stop execution.
+        }
       }
       
+      // If either the new user setup or existing user login audit was successful:
       router.push(`/${lang}/dashboard`);
     } catch (e) {
       const authError = e as AuthError;

@@ -127,6 +127,8 @@
     "errorGeneric": "Ocurrió un error inesperado. Por favor, inténtalo de nuevo.",
     "errorAccountExists": "Ya existe una cuenta con este correo electrónico utilizando un método de inicio de sesión diferente.",
     "errorGoogleSignInFailed": "Error al iniciar sesión con Google. Comprueba la configuración de tu proyecto de Firebase e inténtalo de nuevo.",
+    "errorPartialSignup": "Tu cuenta fue creada, pero la configuración final falló. Por favor, contacta a soporte.",
+    "errorBackendLoginFailed": "No se pudo verificar tu sesión con nuestros servidores. Por favor, inténtalo de nuevo.",
     "termsAgreementPrefix": "Al continuar, aceptas nuestros ",
     "termsAgreementLink": "Términos de Servicio",
     "termsAgreementSuffix": "."

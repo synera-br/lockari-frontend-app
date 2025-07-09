@@ -127,6 +127,8 @@
     "errorGeneric": "An unexpected error occurred. Please try again.",
     "errorAccountExists": "An account with this email already exists using a different sign-in method.",
     "errorGoogleSignInFailed": "Google Sign-In failed. Please check your Firebase project configuration and try again.",
+    "errorPartialSignup": "Your account was created, but the final setup failed. Please contact support.",
+    "errorBackendLoginFailed": "Could not verify your session with our servers. Please try again.",
     "termsAgreementPrefix": "By continuing, you agree to our ",
     "termsAgreementLink": "Terms of Service",
     "termsAgreementSuffix": "."
