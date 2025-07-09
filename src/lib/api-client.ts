@@ -1,16 +1,19 @@
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
 import { BACKEND_URL } from '@/lib/firebase/config';
+import { debugError, debugLog } from '@/lib/debug';
 
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-// This key MUST be the same one used by the backend and sent in the X-Token header.
+// This is the SINGLE SOURCE OF TRUTH for the shared secret.
+// It is used for both encryption and for the X-Token header.
 const SHARED_SECRET_BASE64 = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
 
 try {
+    debugLog(`API Client: Using encryption key from env var.`);
     const decodedKey = CryptoJS.enc.Base64.parse(SHARED_SECRET_BASE64);
     if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
@@ -88,7 +91,7 @@ function decryptData(base64Payload: string): any {
     }
     return JSON.parse(decryptedDataString);
   } catch (error) {
-    console.error("APIClient: Error during decryption in decryptData:", error);
+    debugError("APIClient: Error during decryption in decryptData:", error);
     if (error instanceof SyntaxError) {
         throw new Error("Failed to parse JSON after decryption. Data may be corrupt or not valid JSON.");
     }
@@ -106,7 +109,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       // Force a token refresh to get the very latest token. This is crucial after login/signup.
       token = await currentUser.getIdToken(true); 
     } catch (error) {
-      console.error("APIClient: Error getting Firebase ID token:", error);
+      debugError("APIClient: Error getting Firebase ID token:", error);
     }
   }
 
@@ -140,7 +143,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       headers.set('Content-Type', 'application/json'); 
     } catch (error) {
       clearTimeout(timeoutId);
-      console.error("APIClient: Error encrypting request body:", error);
+      debugError("APIClient: Error encrypting request body:", error);
       throw error;
     }
   }
@@ -151,10 +154,10 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   } catch (networkError: any) {
     clearTimeout(timeoutId);
     if (networkError.name === 'AbortError') {
-      console.error(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
+      debugError(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
       throw new Error(`Request to the server timed out. Please check if the backend is running and accessible at ${url}.`);
     }
-    console.error(`APIClient: Network error during fetch to URL: ${url}. Error:`, networkError);
+    debugError(`APIClient: Network error during fetch to URL: ${url}. Error:`, networkError);
     throw new Error(
       `Failed to communicate with the server (${url}). Check your connection and if the backend server is accessible. Details: ${networkError.message || 'Unknown network error'}`
     );
@@ -180,7 +183,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       }
       return response;
     } catch (error) {
-      console.error("APIClient: Error attempting to process/decrypt JSON response:", error);
+      debugError("APIClient: Error attempting to process/decrypt JSON response:", error);
       return response;
     }
   }
