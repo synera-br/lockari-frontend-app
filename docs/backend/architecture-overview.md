@@ -26,7 +26,7 @@ All authenticated endpoints must be protected. The frontend will include a Fireb
 The backend **must** implement a middleware to:
 1. Extract the token from the header.
 2. Verify the token's signature and expiration using the Firebase Admin SDK for Go.
-3. Extract the user's UID from the verified token and make it available in the request context for subsequent handlers.
+3. Extract the user's UID and any custom claims (like `tenantId`) from the verified token and make them available in the request context for subsequent handlers.
 
 ### 2.2. Custom Headers
 
@@ -40,18 +40,22 @@ The backend should expect and can utilize the following headers sent by the fron
 
 ## 3. Core Backend Flows
 
-### 3.1. Critical User Registration Flow
+### 3.1. Critical User Registration & Tenant Creation Flow
 
-The user registration process is a critical transaction that spans both Firebase Authentication (handled by the client) and the backend (tenant creation). The backend's success is mandatory for the user account to be considered valid.
+The user registration process is a critical transaction that spans Firebase Authentication (client-side) and our Go backend (server-side). The backend's success is **mandatory** for the user account to be considered valid and operational.
 
 **Flow:**
-1.  The frontend creates a user in Firebase Authentication (via email/password or social provider).
-2.  Immediately after successful Firebase user creation, the frontend sends a `SIGNUP_SUCCESS` audit event to the backend (e.g., `POST /v1/audit/auth`).
-3.  The backend **must** receive this event and perform all necessary operations to create the user's tenant and associated resources (e.g., in Firestore and OpenFGA).
-4.  **On Success:** The backend must return a `2xx` status code. The frontend sees this and allows the user to proceed to the dashboard.
-5.  **On Failure:** The backend must return a non-`2xx` status code (e.g., `500 Internal Server Error`). The frontend is programmed to interpret this failure as a catastrophic error. It will then automatically **delete the user from Firebase Authentication** (rollback) and display an error message to the user, asking them to try again.
+1.  **Frontend:** The user creates an account in Firebase Authentication (e.g., via email/password or a social provider).
+2.  **Frontend:** Immediately after a successful Firebase user creation, the frontend sends a `SIGNUP_SUCCESS` audit event to a dedicated backend endpoint (e.g., `POST /v1/on-user-signed-up`).
+3.  **Backend (Go) Transaction:** Upon receiving this event, the backend must perform the following atomic operations:
+    a. **Generate a dynamic `tenantId`:** Create a new, unique identifier for the tenant (e.g., using a UUID library).
+    b. **Create Tenant & User Records in Firestore:** Create the tenant document (`/tenants/{newTenantId}`) and the initial user document within that tenant (`/tenants/{newTenantId}/users/{userId}`).
+    c. **Set Firebase Custom Claims:** Use the Firebase Admin SDK to "stamp" the `tenantId` and the initial `role` (e.g., `owner`) onto the user's authentication profile. This is the most critical step for linking the user to their tenant.
+    d. **Write Initial OpenFGA Tuples:** If necessary, write the initial ownership relationship to OpenFGA.
+4.  **On Success:** The backend returns a `2xx` status code. The frontend sees this and allows the user to proceed to the dashboard. The user's next token refresh will automatically include the new custom claims.
+5.  **On Failure:** If any step in the backend transaction (3a-3d) fails, the backend **must** return a non-`2xx` status code. The frontend is programmed to interpret this as a catastrophic failure. It will then automatically **delete the user from Firebase Authentication** (rollback) and display an error message, asking the user to try again.
 
-This "transactional" approach ensures there are no "orphan" users in the system (i.e., users who exist in Firebase but not in the backend's tenant structure).
+This "transactional" approach ensures there are no "orphan" users in the system (i.e., users who exist in Firebase Auth but have no `tenantId` claim or corresponding tenant data).
 
 ---
 

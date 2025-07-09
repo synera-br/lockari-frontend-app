@@ -8,6 +8,20 @@ Custom claims are key-value pairs that you can embed into a user's ID token. The
 
 ---
 
+## When Does This Code Run?
+
+This function is a core part of the **user registration flow**. It is executed on the backend immediately after the frontend confirms that a new user has been created in Firebase Authentication.
+
+1.  **Frontend:** User signs up.
+2.  **Frontend:** Calls a backend endpoint like `/v1/on-user-signed-up`.
+3.  **Backend:** Executes the logic to create a new tenant and then calls `setUserClaims` to permanently associate that user with their new tenant.
+
+## How to Generate the `tenantId`?
+
+The `tenantId` should be a **Universally Unique Identifier (UUID)**. Do not use a hash. A UUID ensures that each tenant has a completely unique ID that will not collide with any other. Most Go libraries provide a simple way to generate a UUID (e.g., `github.com/google/uuid`).
+
+---
+
 ## The Go Code
 
 This example shows a function `setUserClaims` that takes a user's UID and the desired claims (like `tenantId` and `role`) and applies them to the user's account.
@@ -29,8 +43,14 @@ import (
 //
 // In the Lockari Vault architecture, the `tenantId` claim is CRITICAL.
 // It should NEVER be empty or omitted for a valid, active user, as it's required
-// by the backend to locate the user's data in Firestore.
+// by the backend to locate the user's data in Firestore. A user without a tenantId
+// is considered an invalid or incomplete user.
 func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, tenantId string, role string) error {
+	// A check to ensure we never try to set an empty tenantId.
+	if tenantId == "" {
+		return fmt.Errorf("tenantId cannot be empty for user %s", uid)
+	}
+
 	// Define the claims to be set.
 	// You can add any key-value pairs you need.
 	// IMPORTANT: The total size of the claims object must not exceed 1000 bytes.
@@ -54,14 +74,12 @@ func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, ten
 	return nil
 }
 
-// --- Usage Example (e.g., inside a Gin HTTP handler) ---
+// --- Usage Example (e.g., inside a Gin HTTP handler for user signup) ---
 //
-// func (server *Server) handleSetUserRole(c *gin.Context) {
-//     // In a real application, you would get these values from the request body.
-//     // Ensure the calling user has permission to perform this action! (e.g., is an owner/admin of the tenant).
+// func (server *Server) handleNewUserSignup(c *gin.Context) {
 //     var req struct {
-//         TargetUID string `json:"targetUid" binding:"required"`
-//         Role      string `json:"role" binding:"required"`
+//         UID      string `json:"uid" binding:"required"`
+//         // ... other signup data from frontend
 //     }
 //
 //     if err := c.ShouldBindJSON(&req); err != nil {
@@ -69,19 +87,21 @@ func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, ten
 //         return
 //     }
 //
-//     // Extract the calling user's claims from the context (set by your auth middleware).
-//     claims := c.MustGet("claims").(YourClaimsType)
-//     
-//     // Here you would call the function to set the claims on the *target* user.
-//     // The tenantId comes from the *calling admin's* token to prevent them from
-//     // assigning users to other tenants.
-//     err := setUserClaims(c.Request.Context(), server.firebaseAuthClient, req.TargetUID, claims.TenantID, req.Role)
+//     // 1. Generate a new, unique tenant ID.
+//     newTenantID := uuid.New().String() 
+//
+//     // 2. Create the tenant and user documents in Firestore...
+//     // (Your logic here)
+//
+//     // 3. Set the custom claims for the new user.
+//     err := setUserClaims(c.Request.Context(), server.firebaseAuthClient, req.UID, newTenantID, "owner")
 //     if err != nil {
-//         c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user role"})
+//         // IMPORTANT: If this fails, you should roll back the Firestore changes.
+//         c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finalize user setup"})
 //         return
 //     }
 //
-//     c.JSON(http.StatusOK, gin.H{"message": "user role updated successfully"})
+//     c.JSON(http.StatusOK, gin.H{"message": "user and tenant created successfully"})
 // }
 ```
 
@@ -97,7 +117,7 @@ func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, ten
     *   This propagation can take a few moments, but the frontend will automatically receive the updated token as part of the normal token refresh cycle managed by the Firebase JS SDK.
 
 3.  **Usage in an HTTP Handler**:
-    *   The commented-out code shows a conceptual example of how you would use this function.
-    *   An admin user (e.g., an `owner`) would make an API call to an endpoint like `/users/set-role`.
-    *   The backend middleware would first verify the admin's token and permissions.
-    *   The handler would then call `setUserClaims` to apply the new role to the *target* user.
+    *   The commented-out code shows a conceptual example of how you would use this function during user registration.
+    *   A handler receives the new user's `uid` from the frontend.
+    *   It generates a new `tenantId`.
+    *   It calls `setUserClaims` to apply the `tenantId` and an initial `role` of `owner` to that user.
