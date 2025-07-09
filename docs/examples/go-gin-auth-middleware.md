@@ -12,7 +12,7 @@ This document provides a practical Go code example of an authentication middlewa
 
 ## The Go Code
 
-This example assumes you have the `Authenticator` interface and the `firebaseAuthenticator` implementation we previously discussed.
+This example assumes you have an `Authenticator` interface with a `ValidateToken` method.
 
 ```go
 package middleware
@@ -80,6 +80,7 @@ func AuthMiddleware(authenticator auth.Authenticator) gin.HandlerFunc {
 		tenantId, ok := claims["tenantId"].(string)
 		if !ok || tenantId == "" {
 			log.Printf("Custom claim 'tenantId' not found for user %s", uid)
+			// For this application, a missing tenantId is a critical error.
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User is not associated with a tenant"})
 			return
 		}
@@ -148,8 +149,8 @@ func handleListVaults(c *gin.Context) {
 	// Retrieve the user and tenant ID from the context.
 	// We can be sure these values exist and are valid because the middleware passed.
 	
-    // We use c.GetString() which panics if the key doesn't exist.
-    // This is safe here because the middleware guarantees its presence.
+    // We use c.GetString() which is convenient. It returns an empty string if the key doesn't exist.
+    // For critical data like this, you could also use c.Get() and a type assertion for more safety.
 	userID := c.GetString(string(middleware.UserIDContextKey))
 	tenantID := c.GetString(string(middleware.TenantIDContextKey))
 
