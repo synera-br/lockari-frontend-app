@@ -1,6 +1,6 @@
-# Go Example: Setting Firebase Custom Claims
+# Go Example: Setting and Updating Firebase Custom Claims
 
-This document provides a practical Go code example demonstrating how to set custom claims on a user's Firebase account from a trusted backend server.
+This document provides a practical Go code example demonstrating how to safely set and update custom claims on a user's Firebase account from a trusted backend server.
 
 Custom claims are key-value pairs that you can embed into a user's ID token. They are used to implement role-based access control and pass tenant information securely to the frontend.
 
@@ -10,21 +10,22 @@ Custom claims are key-value pairs that you can embed into a user's ID token. The
 
 ## When Does This Code Run?
 
-This function is a core part of the **user registration flow**. It is executed on the backend immediately after the frontend confirms that a new user has been created in Firebase Authentication.
+This logic is typically executed in two main scenarios:
 
-1.  **Frontend:** User signs up.
-2.  **Frontend:** Calls a backend endpoint like `/v1/on-user-signed-up`.
-3.  **Backend:** Executes the logic to create a new tenant and then calls `setUserClaims` to permanently associate that user with their new tenant.
+1.  **User Registration:** Immediately after a new user signs up, the backend calls this function to set their initial claims, such as `tenantId` and `role: 'owner'`.
+2.  **Permission Changes:** When an administrator changes a user's role or adds them to a new group, the backend calls this function to update their claims.
 
-## How to Generate the `tenantId`?
+## Critical Best Practice: Read-Merge-Write
 
-The `tenantId` should be a **Universally Unique Identifier (UUID)**. Do not use a hash. A UUID ensures that each tenant has a completely unique ID that will not collide with any other. Most Go libraries provide a simple way to generate a UUID (e.g., `github.com/google/uuid`).
+The `SetCustomUserClaims` function **overwrites all existing custom claims** for a user. A naive implementation that only sets new claims will erase any previous ones. For example, setting a `role` would erase the `tenantId`.
+
+The correct and safe pattern is to **read** the existing claims, **merge** them with your changes, and then **write** the complete, updated map back. The example below implements this safe approach.
 
 ---
 
 ## The Go Code
 
-This example shows a function `setUserClaims` that takes a user's UID and the desired claims (like `tenantId` and `role`) and applies them to the user's account.
+This example shows a robust function `updateUserClaims` that safely adds or modifies claims without deleting existing ones.
 
 ```go
 package examples
@@ -37,40 +38,44 @@ import (
 	"firebase.google.com/go/v4/auth"
 )
 
-// setUserClaims sets custom claims for a user, such as their tenant ID and role.
+// updateUserClaims safely updates custom claims for a user by merging them with existing claims.
 // This function MUST be executed on a trusted backend server.
-// The `authClient` should be an initialized Firebase Auth client from the Admin SDK.
 //
-// In the Lockari Vault architecture, the `tenantId` claim is CRITICAL.
-// It should NEVER be empty or omitted for a valid, active user, as it's required
-// by the backend to locate the user's data in Firestore. A user without a tenantId
-// is considered an invalid or incomplete user.
-func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, tenantId string, role string) error {
-	// A check to ensure we never try to set an empty tenantId.
-	if tenantId == "" {
-		return fmt.Errorf("tenantId cannot be empty for user %s", uid)
+// The `authClient` should be an initialized Firebase Auth client from the Admin SDK.
+// The `newClaims` map contains only the claims you want to add or change.
+func updateUserClaims(ctx context.Context, authClient *auth.Client, uid string, newClaims map[string]interface{}) error {
+	// 1. Get the full user record.
+	user, err := authClient.GetUser(ctx, uid)
+	if err != nil {
+		log.Printf("error getting user for claims update: %v\n", err)
+		return fmt.Errorf("could not retrieve user %s: %w", uid, err)
 	}
 
-	// Define the claims to be set.
-	// You can add any key-value pairs you need.
+	// 2. Initialize a new map with the user's existing custom claims.
+	// This is the crucial step to avoid overwriting.
+	mergedClaims := make(map[string]interface{})
+	if user.CustomClaims != nil {
+		for key, value := range user.CustomClaims {
+			mergedClaims[key] = value
+		}
+	}
+
+	// 3. Merge the new claims into the map, overwriting any existing keys.
+	for key, value := range newClaims {
+		mergedClaims[key] = value
+	}
+	
 	// IMPORTANT: The total size of the claims object must not exceed 1000 bytes.
-	claims := map[string]interface{}{
-		"tenantId": tenantId, // This is non-optional for a user to access the system.
-		"role":     role,
-		// You could add other information like the plan type
-		// "plan": "pro",
-	}
+	// Add a check here in a real application if the claims can be large.
 
-	// SetCustomUserClaims overwrites any existing custom claims for the user.
-	// If you need to add claims without overwriting, you must first read the
-	// existing claims, merge them with the new ones, and then set the result.
-	err := authClient.SetCustomUserClaims(ctx, uid, claims)
+	// 4. Set the newly merged claims object.
+	err = authClient.SetCustomUserClaims(ctx, uid, mergedClaims)
 	if err != nil {
 		log.Printf("error setting custom claims for user %s: %v\n", uid, err)
 		return fmt.Errorf("failed to set custom claims: %w", err)
 	}
 
-	log.Printf("Successfully set custom claims for user %s. TenantID: %s, Role: %s", uid, tenantId, role)
+	log.Printf("Successfully updated custom claims for user %s.", uid)
 	return nil
 }
 
@@ -78,46 +83,54 @@ func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, ten
 //
 // func (server *Server) handleNewUserSignup(c *gin.Context) {
 //     var req struct {
-//         UID      string `json:"uid" binding:"required"`
-//         // ... other signup data from frontend
+//         UID string `json:"uid" binding:"required"`
 //     }
-//
-//     if err := c.ShouldBindJSON(&req); err != nil {
-//         c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-//         return
-//     }
+//     if err := c.ShouldBindJSON(&req); err != nil { /* ... */ }
 //
 //     // 1. Generate a new, unique tenant ID.
 //     newTenantID := uuid.New().String() 
 //
-//     // 2. Create the tenant and user documents in Firestore...
-//     // (Your logic here)
+//     // 2. Define the initial claims for the new user.
+//     initialClaims := map[string]interface{}{
+//         "tenantId": newTenantID,
+//         "role":     "owner",
+//     }
 //
-//     // 3. Set the custom claims for the new user.
-//     err := setUserClaims(c.Request.Context(), server.firebaseAuthClient, req.UID, newTenantID, "owner")
+//     // 3. Call the safe update function.
+//     err := updateUserClaims(c.Request.Context(), server.firebaseAuthClient, req.UID, initialClaims)
 //     if err != nil {
-//         // IMPORTANT: If this fails, you should roll back the Firestore changes.
+//         // IMPORTANT: If this fails, roll back any other setup steps (like Firestore writes).
 //         c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finalize user setup"})
 //         return
 //     }
 //
-//     c.JSON(http.StatusOK, gin.H{"message": "user and tenant created successfully"})
+//     c.JSON(http.StatusOK, gin.H{"message": "user setup complete"})
+// }
+//
+// --- Usage Example (e.g., changing a user's role) ---
+//
+// func (server *Server) handleChangeUserRole(c *gin.Context) {
+//     // ... get target UID and new role from request ...
+//
+//     roleUpdate := map[string]interface{}{"role": "admin"}
+//
+//     // This will ONLY update the role, leaving the tenantId and other claims intact.
+//     err := updateUserClaims(c.Request.Context(), server.firebaseAuthClient, targetUID, roleUpdate)
+//     if err != nil { /* ... handle error ... */ }
+//
+//     c.JSON(http.StatusOK, gin.H{"message": "role updated successfully"})
 // }
 ```
 
 ### How It Works
 
-1.  **`setUserClaims` function**:
-    *   It takes a `context`, an initialized `auth.Client`, a `uid`, `tenantId`, and a `role`.
-    *   It creates a `map[string]interface{}` which will hold the claims.
-    *   It calls `authClient.SetCustomUserClaims(ctx, uid, claims)`. This is the core Firebase Admin SDK call that securely applies the claims to the user's record in Firebase's backend.
+1.  **`updateUserClaims` function**:
+    *   It takes the `uid` and a map of `newClaims` (only the ones you want to change).
+    *   It first fetches the complete `UserRecord`.
+    *   It copies the `user.CustomClaims` into a new `mergedClaims` map.
+    *   It then merges the `newClaims` into the `mergedClaims` map. This ensures any old claims are preserved.
+    *   Finally, it calls `authClient.SetCustomUserClaims` with the complete, merged map.
 
 2.  **Propagation to the ID Token**:
-    *   Once the claims are set, the Firebase Authentication backend ensures that the **next time** the user's ID token is minted (either on a new login or when the current token is refreshed), these custom claims will be included in the token's payload.
-    *   This propagation can take a few moments, but the frontend will automatically receive the updated token as part of the normal token refresh cycle managed by the Firebase JS SDK.
-
-3.  **Usage in an HTTP Handler**:
-    *   The commented-out code shows a conceptual example of how you would use this function during user registration.
-    *   A handler receives the new user's `uid` from the frontend.
-    *   It generates a new `tenantId`.
-    *   It calls `setUserClaims` to apply the `tenantId` and an initial `role` of `owner` to that user.
+    *   Once the claims are set, the Firebase Authentication backend ensures that the **next time** the user's ID token is minted (either on a new login or when the current token is refreshed), these updated claims will be included in the token's payload.
+    *   This propagation is handled automatically by the Firebase SDKs on the client.
