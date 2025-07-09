@@ -1,6 +1,6 @@
 # Go Example: Setting Firebase Custom Claims
 
-This document provides a practical Go code example demonstrating how to set custom claims on a Firebase user account from a trusted backend server.
+This document provides a practical Go code example demonstrating how to set custom claims on a user's Firebase account from a trusted backend server.
 
 Custom claims are key-value pairs that you can embed into a user's ID token. They are used to implement role-based access control and pass tenant information securely to the frontend.
 
@@ -26,12 +26,16 @@ import (
 // setUserClaims sets custom claims for a user, such as their tenant ID and role.
 // This function MUST be executed on a trusted backend server.
 // The `authClient` should be an initialized Firebase Auth client from the Admin SDK.
+//
+// In the Lockari Vault architecture, the `tenantId` claim is CRITICAL.
+// It should NEVER be empty or omitted for a valid, active user, as it's required
+// by the backend to locate the user's data in Firestore.
 func setUserClaims(ctx context.Context, authClient *auth.Client, uid string, tenantId string, role string) error {
 	// Define the claims to be set.
 	// You can add any key-value pairs you need.
 	// IMPORTANT: The total size of the claims object must not exceed 1000 bytes.
 	claims := map[string]interface{}{
-		"tenantId": tenantId,
+		"tenantId": tenantId, // This is non-optional for a user to access the system.
 		"role":     role,
 		// You could add other information like the plan type
 		// "plan": "pro",
