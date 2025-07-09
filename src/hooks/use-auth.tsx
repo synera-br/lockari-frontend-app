@@ -31,7 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(user);
         try {
           // When a user is found, get their token result to access custom claims
-          // The `true` argument forces a token refresh to get the latest claims
+          // The `true` argument forces a token refresh to get the latest claims,
+          // which is crucial after login/signup to check for tenantId.
           const idTokenResult: IdTokenResult = await user.getIdTokenResult(true); 
           
           // Set the custom claims in our state

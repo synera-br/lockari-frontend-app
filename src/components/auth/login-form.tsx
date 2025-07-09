@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signInWithEmailAndPassword, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
+import { signInWithEmailAndPassword, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, type User } from 'firebase/auth';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,63 +86,68 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
     }
   };
 
+  /**
+   * Handles the entire Google Sign-In flow, including user provisioning.
+   * This function is "self-healing": if a user exists in Firebase Auth but not in our backend (no tenantId),
+   * it will automatically trigger the signup flow to provision them.
+   */
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+
     try {
       const result = await signInWithPopup(auth, provider);
-      const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
-      
-      if (isNewUser) {
-        // A new account was created via the login page.
-        // We need to notify the backend to create the associated tenant.
-        debugLog('Google Sign-In: New user detected, performing signup audit...');
+      const user = result.user;
+
+      // Force a token refresh to get the very latest custom claims from the backend.
+      const idTokenResult = await user.getIdTokenResult(true);
+      const tenantId = idTokenResult.claims.tenantId;
+
+      if (tenantId) {
+        // --- Flow for EXISTING, FULLY PROVISIONED user ---
+        debugLog('Google Sign-In: Existing user with tenantId detected, performing login audit...');
+        const auditResult = await auditAuthEvent({
+          eventType: 'LOGIN_SUCCESS',
+          user: { uid: user.uid, email: user.email },
+        });
+
+        if (!auditResult.success) {
+          debugError('Google login backend audit failed:', auditResult.message);
+          setError(dictionary.errorBackendLoginFailed || 'Could not verify your session with our servers. Please try again.');
+          setLoading(false);
+          return;
+        }
+
+      } else {
+        // --- Flow for NEW or UNPROVISIONED user ---
+        // This user either just signed up or their previous tenant creation failed.
+        // We trigger the signup flow to create their resources on the backend.
+        debugLog('Google Sign-In: New or unprovisioned user detected. Triggering signup/provisioning flow...');
         const auditResult = await auditAuthEvent({
           eventType: 'SIGNUP_SUCCESS',
           user: {
-            uid: result.user.uid,
-            email: result.user.email,
-            name: result.user.displayName || 'Google User',
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || 'Google User',
             plan: 'free',
-          }
+          },
         });
-
-        // PER USER REQUEST: Do NOT delete the user on backend failure.
-        // Instead, inform them about the partial success.
+        
         if (!auditResult.success) {
           debugError('Google login/signup backend audit failed:', auditResult.message);
+          // IMPORTANT: We do NOT delete the user here. We inform them of the partial failure.
           setError(dictionary.errorPartialSignup || 'Your account was created, but the final setup failed. Please contact support.');
           setLoading(false);
-          return; // Stop execution, user stays on login page.
+          return;
         }
-        
         debugLog('Google Sign-In: Backend tenant creation successful.');
-
-      } else {
-        // This is a returning user. We audit the login event.
-        debugLog('Google Sign-In: Existing user detected, performing login audit...');
-        const auditResult = await auditAuthEvent({
-          eventType: 'LOGIN_SUCCESS',
-          user: {
-            uid: result.user.uid,
-            email: result.user.email,
-          }
-        });
-        
-        // If auditing the login fails, we should prevent the user from proceeding
-        // as some backend state might be inconsistent.
-        if (!auditResult.success) {
-            debugError('Google login backend audit failed:', auditResult.message);
-            setError(dictionary.errorBackendLoginFailed || 'Could not verify your session with our servers. Please try again.');
-            setLoading(false);
-            return; // Stop execution.
-        }
       }
       
-      // If either the new user setup or existing user login audit was successful:
+      // If either flow was successful, redirect to the dashboard.
       router.push(`/${lang}/dashboard`);
+
     } catch (e) {
       const authError = e as AuthError;
       switch (authError.code) {
@@ -157,10 +162,10 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
           setError(dictionary.errorGoogleSignInFailed);
           debugError("Google Sign-In Error:", authError);
       }
-    } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <Card className="w-full max-w-sm shadow-xl">
