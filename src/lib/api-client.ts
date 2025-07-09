@@ -162,6 +162,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   try {
     response = await fetch(url, newOptions);
   } catch (networkError: any) {
+    clearTimeout(timeoutId); // Clear timeout before handling the error
     if (networkError.name === 'AbortError') {
       console.error(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
       throw new Error(`The request to the server timed out. Please check if the backend is running and accessible at ${url}.`);

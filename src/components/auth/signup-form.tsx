@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, type UserCredential } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 
@@ -73,9 +73,11 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
   const onSubmit: SubmitHandler<SignupSchema> = async (data) => {
     setLoading(true);
     setError(null);
+    let userCredential: UserCredential | undefined;
+
     try {
       // Step 1: Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       
       // Step 2: Update user profile with name
       await updateProfile(userCredential.user, { displayName: data.name });
@@ -93,7 +95,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       });
 
       // Step 4: Notify backend to create tenant. This is a mandatory step.
-      console.log('User created in Firebase. Notifying backend to create tenant...');
+      console.log(`User ${userCredential.user.uid} created in Firebase. Notifying backend to create tenant...`);
       const auditResult = await auditAuthEvent({
         eventType: 'SIGNUP_SUCCESS',
         user: {
@@ -104,30 +106,43 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         }
       });
 
-      // Step 5: Handle backend response (Rollback or Success)
+      // Step 5: Handle backend response. If it fails, throw an error to trigger the catch block for rollback.
       if (!auditResult.success) {
-        // This is the critical rollback step if backend fails
-        console.error('Backend tenant creation failed. Rolling back Firebase user...');
-        try {
-          await userCredential.user.delete();
-          console.log('Firebase user rolled back successfully.');
-        } catch (deleteError) {
-          console.error("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
-        }
-        // Display the specific error from the backend call
-        setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
-        setLoading(false); // Stop loading indicator on failure
-        return; 
+        throw new Error(auditResult.message || 'Failed to create your account on our servers. Please try again.');
       }
       
       console.log('Backend tenant created successfully. Redirecting to dashboard.');
       router.push(`/${lang}/dashboard`);
 
-    } catch (e) {
-      const authError = e as AuthError;
-      console.error("Firebase Signup Error:", authError);
-      setError(getFirebaseErrorMessage(authError.code));
-      setLoading(false);
+    } catch (e: any) {
+      // This block catches errors from Firebase Auth AND our custom thrown error from the audit.
+      
+      // First, perform rollback if a user was successfully created before the error.
+      if (userCredential) {
+        console.error('An error occurred after user creation. Rolling back Firebase user...');
+        try {
+          await userCredential.user.delete();
+          console.log('Firebase user rolled back successfully.');
+        } catch (deleteError) {
+          console.error("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
+          // Even if rollback fails, we must inform the user about the original error.
+        }
+      }
+
+      // Determine the error message to display
+      let errorMessage: string;
+      if (e instanceof Error && (e.message.includes('Failed to create') || e.message.includes('timed out'))) {
+        // This is our custom error from the failed audit or a timeout.
+        errorMessage = e.message;
+      } else {
+        // This is likely a Firebase Auth error
+        const authError = e as AuthError;
+        console.error("Firebase/Auth Error:", authError);
+        errorMessage = getFirebaseErrorMessage(authError.code);
+      }
+      
+      setError(errorMessage);
+      setLoading(false); // Ensure loading is stopped on any failure.
     }
   };
 
