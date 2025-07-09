@@ -4,6 +4,7 @@
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
 import { BACKEND_URL, BACKEND_API_TOKEN } from '@/lib/firebase/config';
+import { debugError, debugWarn } from '@/lib/debug';
 
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
@@ -14,23 +15,21 @@ const SHARED_SECRET_BASE64 = process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
 let encryptionKeyWordArray: CryptoJS.lib.WordArray | null = null;
 
 if (!SHARED_SECRET_BASE64) {
-  if (process.env.NODE_ENV === 'development') {
-    console.warn("API Client Encryption WARN: NEXT_PUBLIC_ENCRYPTION_KEY is not set. Using a default insecure key for development. THIS IS NOT FOR PRODUCTION.");
-  }
+  debugWarn("API Client Encryption WARN: NEXT_PUBLIC_ENCRYPTION_KEY is not set. Using a default insecure key for development. THIS IS NOT FOR PRODUCTION.");
   // Default 32-byte key for AES-256 for dev environments when no key is provided
   encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
 } else {
     try {
         const decodedKey = CryptoJS.enc.Base64.parse(SHARED_SECRET_BASE64);
         if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
-            console.warn(
+            debugWarn(
                 `API Client Encryption WARN: The Base64 decoded encryption key has ${decodedKey.sigBytes} bytes. ` +
                 `AES requires keys of 16, 24, or 32 bytes (128, 192, or 256 bits respectively).`
             );
         }
         encryptionKeyWordArray = decodedKey;
     } catch (e) {
-        console.error("Failed to parse the Base64 encryption key from NEXT_PUBLIC_ENCRYPTION_KEY. Please ensure it is a valid Base64 string.", e);
+        debugError("Failed to parse the Base64 encryption key from NEXT_PUBLIC_ENCRYPTION_KEY. Please ensure it is a valid Base64 string.", e);
     }
 }
 
@@ -102,7 +101,7 @@ function decryptData(base64Payload: string): any {
     }
     return JSON.parse(decryptedDataString);
   } catch (error) {
-    console.error("APIClient: Error in decryptData:", error);
+    debugError("APIClient: Error in decryptData:", error);
     if (error instanceof SyntaxError) {
         throw new Error("Failed to parse JSON after decryption. The data may be corrupt or not valid JSON.");
     }
@@ -119,7 +118,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
     try {
       userToken = await currentUser.getIdToken(true); // Force refresh for latest token
     } catch (error) {
-      console.error("APIClient: Error getting Firebase ID token:", error);
+      debugError("APIClient: Error getting Firebase ID token:", error);
     }
   }
 
@@ -153,7 +152,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       headers.set('Content-Type', 'application/json'); 
     } catch (error) {
       clearTimeout(timeoutId); // Clear timeout on early error
-      console.error("APIClient: Error encrypting request body:", error);
+      debugError("APIClient: Error encrypting request body:", error);
       throw error;
     }
   }
@@ -164,10 +163,10 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   } catch (networkError: any) {
     clearTimeout(timeoutId); // Clear timeout before handling the error
     if (networkError.name === 'AbortError') {
-      console.error(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
+      debugError(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
       throw new Error(`The request to the server timed out. Please check if the backend is running and accessible at ${url}.`);
     }
-    console.error(`APIClient: Network error during fetch to URL: ${url}. Error:`, networkError);
+    debugError(`APIClient: Network error during fetch to URL: ${url}. Error:`, networkError);
     throw new Error(
       `Failed to communicate with the server (${url}). Check your connection and if the backend server is accessible. Details: ${networkError.message || 'Unknown network error'}`
     );
@@ -199,7 +198,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       return response;
     } catch (error) {
       // If JSON parsing or decryption fails, return the original response for the caller to handle.
-      console.error("APIClient: Error trying to process/decrypt JSON response:", error);
+      debugError("APIClient: Error trying to process/decrypt JSON response:", error);
       return response;
     }
   }

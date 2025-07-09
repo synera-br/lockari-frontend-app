@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import { debugLog, debugError } from '@/lib/debug';
 
 const createVaultSchema = z.object({
   name: z.string().min(2, { message: 'Vault name must be at least 2 characters.' }),
@@ -46,11 +47,11 @@ export async function createVault(
   try {
     // TODO: Call the Go backend here to create the vault in Firestore.
     // This is a simulation.
-    console.log('--- CREATING VAULT (SIMULATION) ---');
-    console.log('Name:', name);
-    console.log('Description:', description);
-    console.log('Tags:', tags?.split(',').map(t => t.trim()).filter(Boolean) ?? []);
-    console.log('------------------------------------');
+    debugLog('--- CREATING VAULT (SIMULATION) ---');
+    debugLog('Name:', name);
+    debugLog('Description:', description);
+    debugLog('Tags:', tags?.split(',').map(t => t.trim()).filter(Boolean) ?? []);
+    debugLog('------------------------------------');
     
     // Simulate a network delay
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -63,11 +64,15 @@ export async function createVault(
       type: 'success',
     };
   } catch (error) {
-    console.error('Error creating vault:', error);
+    debugError('Error creating vault:', error);
     return {
       message: 'An unexpected error occurred. Please try again later.',
       type: 'error',
-      fields: { name, description, tags },
+      fields: { 
+        name, 
+        description: description ?? '', 
+        tags: tags ?? '' 
+      },
     };
   }
 }

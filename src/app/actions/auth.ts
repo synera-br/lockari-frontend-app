@@ -4,6 +4,7 @@
 import { headers } from 'next/headers';
 import { fetchWithAuthHeaders } from '@/lib/api-client';
 import { BACKEND_URL } from '@/lib/firebase/config';
+import { debugLog, debugError } from '@/lib/debug';
 
 interface AuditEventPayload {
   eventType: 'LOGIN_SUCCESS' | 'SIGNUP_SUCCESS';
@@ -41,7 +42,7 @@ export async function auditAuthEvent(
   };
   
   if (!BACKEND_URL) {
-    console.log('AUDIT EVENT (simulated - BACKEND_URL not set):', JSON.stringify(payload, null, 2));
+    debugLog('AUDIT EVENT (simulated - BACKEND_URL not set):', JSON.stringify(payload, null, 2));
     return { success: true, message: "Simulated audit event. BACKEND_URL not configured." };
   }
 
@@ -56,17 +57,17 @@ export async function auditAuthEvent(
       // The response body might be encrypted, but for errors, it's often plain text.
       // The api-client doesn't decrypt error responses.
       const errorText = await response.text();
-      console.error('Failed to send audit event to backend:', response.status, errorText);
+      debugError('Failed to send audit event to backend:', response.status, errorText);
       return { success: false, message: `Failed to send audit event: ${errorText}` };
     }
     
     // The response from a successful audit might be empty or a simple confirmation.
     // The api-client will attempt to decrypt it if it has a payload.
-    console.log('Successfully sent audit event to backend.');
+    debugLog('Successfully sent audit event to backend.');
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
-    console.error('Error sending audit event:', message);
+    debugError('Error sending audit event:', message);
     return { success: false, message: `An unexpected error occurred while sending the audit event: ${message}` };
   }
 

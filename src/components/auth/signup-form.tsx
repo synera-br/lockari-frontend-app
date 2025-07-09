@@ -19,6 +19,7 @@ import { auditAuthEvent } from '@/app/actions/auth';
 import type { Locale } from '@/middleware';
 import { Github, Loader2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
+import { debugLog, debugError, debugTime, debugTimeEnd } from '@/lib/debug';
 
 interface SignupFormProps {
   lang: Locale;
@@ -95,7 +96,8 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       });
 
       // Step 4: Notify backend to create tenant. This is a mandatory step.
-      console.log(`User ${userCredential.user.uid} created in Firebase. Notifying backend to create tenant...`);
+      debugLog(`User ${userCredential.user.uid} created in Firebase. Notifying backend to create tenant...`);
+      debugTime('Backend Audit Request');
       const auditResult = await auditAuthEvent({
         eventType: 'SIGNUP_SUCCESS',
         user: {
@@ -106,12 +108,14 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         }
       });
 
+      debugTimeEnd('Backend Audit Request');
       // Step 5: Handle backend response. If it fails, throw an error to trigger the catch block for rollback.
       if (!auditResult.success) {
+        debugError('Backend audit failed:', auditResult.message);
         throw new Error(auditResult.message || 'Failed to create your account on our servers. Please try again.');
       }
       
-      console.log('Backend tenant created successfully. Redirecting to dashboard.');
+      debugLog('Backend tenant created successfully. Redirecting to dashboard...');
       router.push(`/${lang}/dashboard`);
 
     } catch (e: any) {
@@ -119,12 +123,12 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       
       // First, perform rollback if a user was successfully created before the error.
       if (userCredential) {
-        console.error('An error occurred after user creation. Rolling back Firebase user...');
+        debugError('An error occurred after user creation. Rolling back Firebase user...');
         try {
           await userCredential.user.delete();
-          console.log('Firebase user rolled back successfully.');
+          debugLog('Firebase user rolled back successfully.');
         } catch (deleteError) {
-          console.error("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
+          debugError("CRITICAL: Failed to roll back user creation after backend failure:", deleteError);
           // Even if rollback fails, we must inform the user about the original error.
         }
       }
@@ -137,7 +141,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       } else {
         // This is likely a Firebase Auth error
         const authError = e as AuthError;
-        console.error("Firebase/Auth Error:", authError);
+        debugError("Firebase/Auth Error:", authError);
         errorMessage = getFirebaseErrorMessage(authError.code);
       }
       
@@ -181,10 +185,12 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
 
         // If backend tenant creation fails, roll back user creation.
         if (!auditResult.success) {
+            debugError('Google signup backend audit failed:', auditResult.message);
             try {
               await result.user.delete();
+              debugLog('Google user rolled back successfully.');
             } catch (deleteError) {
-              console.error("Failed to roll back Google user creation:", deleteError);
+              debugError("Failed to roll back Google user creation:", deleteError);
             }
             setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
             setLoading(false);
@@ -217,7 +223,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         default:
            // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
           setError(dictionary.errorGoogleSignInFailed);
-          console.error("Google Sign-In Error:", authError);
+          debugError("Google Sign-In Error:", authError);
           setLoading(false);
       }
     }

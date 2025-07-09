@@ -18,6 +18,7 @@ import { auditAuthEvent } from '@/app/actions/auth';
 import type { Locale } from '@/middleware';
 import { Github, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { debugLog, debugError } from '@/lib/debug';
 
 interface LoginFormProps {
   lang: Locale;
@@ -78,7 +79,7 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
 
     } catch (e) {
       const authError = e as AuthError;
-      console.error("Firebase Login Error:", authError);
+      debugError("Firebase Login Error:", authError);
       setError(getFirebaseErrorMessage(authError.code));
       setLoading(false);
     }
@@ -120,10 +121,12 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
 
         // If backend tenant creation fails, roll back user creation.
         if (!auditResult.success) {
+          debugError('Google login signup backend audit failed:', auditResult.message);
           try {
             await result.user.delete();
+            debugLog('Google user rolled back successfully.');
           } catch (deleteError) {
-            console.error("Failed to roll back Google user creation:", deleteError);
+            debugError("Failed to roll back Google user creation:", deleteError);
           }
           setError(auditResult.message || 'Failed to register your account. Please try again.');
           setLoading(false);
@@ -171,7 +174,7 @@ export function LoginForm({ lang, dictionary }: LoginFormProps) {
         default:
           // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
           setError(dictionary.errorGoogleSignInFailed);
-          console.error("Google Sign-In Error:", authError);
+          debugError("Google Sign-In Error:", authError);
       }
       setLoading(false);
     }
