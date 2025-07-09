@@ -76,18 +76,14 @@ func AuthMiddleware(authenticator auth.Authenticator) gin.HandlerFunc {
 			return
 		}
 
-        // 4. Extract our CUSTOM claim 'tenantId'.
-		tenantId, ok := claims["tenantId"].(string)
-		if !ok || tenantId == "" {
-			log.Printf("Custom claim 'tenantId' not found for user %s", uid)
-			// For this application, a missing tenantId is a critical error.
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "User is not associated with a tenant"})
-			return
-		}
+        // 4. Extract our CUSTOM claim 'tenantId'. This might be empty for a newly signed-up user.
+		tenantId, _ := claims["tenantId"].(string)
 
 		// 5. Store the extracted information in the Gin context.
 		c.Set(string(UserIDContextKey), uid)
-		c.Set(string(TenantIDContextKey), tenantId)
+        if tenantId != "" {
+		    c.Set(string(TenantIDContextKey), tenantId)
+        }
         c.Set(string(ClaimsContextKey), claims) // Optional: store all claims if needed elsewhere
 
 		// 6. Continue to the next handler in the chain.
@@ -112,6 +108,7 @@ import (
 	"your-project/auth"
 	"your-project/middleware"
     "your-project/services" // Assume you have a services package
+    "your-project/entity" // Assume your data entities are here
 )
 
 func main() {
@@ -121,6 +118,7 @@ func main() {
 	if err != nil { /* ... */ }
     
     vaultService := services.NewVaultService(/* ... */)
+    signupService := services.NewSignupService(/* ... */)
 
 	router := gin.Default()
 
@@ -135,6 +133,7 @@ func main() {
 	v1.Use(middleware.AuthMiddleware(authenticator))
 	{
 		// All handlers defined here are now protected.
+		v1.POST("/on-user-signed-up", handleUserSignup(signupService))
 		v1.GET("/vaults", handleListVaults(vaultService))
 		// ... other routes
 	}
@@ -142,21 +141,57 @@ func main() {
 	router.Run(":8080")
 }
 
+// handleUserSignup is an example of a handler for the critical post-registration flow.
+func handleUserSignup(signupService services.SignupService) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // 1. Retrieve the UID of the user MAKING THE REQUEST from the context.
+        // This is guaranteed to be present and valid by the middleware.
+        callerUID := c.GetString(string(middleware.UserIDContextKey))
+
+        // 2. Bind the request body to your signup entity.
+        var signupEvent entity.SignupEvent
+        if err := c.ShouldBindJSON(&signupEvent); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+            return
+        }
+
+        // 3. AUTHORIZATION: Ensure the user making the request is the same user in the payload.
+        // This prevents one user from creating a tenant for another user.
+        if callerUID != signupEvent.GetUser().Uid {
+             c.JSON(http.StatusForbidden, gin.H{"error": "Caller is not authorized to perform this action for the specified user"})
+            return
+        }
+
+        // 4. Call the service layer with the validated data.
+        // The service layer no longer needs to worry about auth tokens, just business logic.
+        createdTenant, err := signupService.Create(c.Request.Context(), signupEvent)
+        if err != nil {
+            // The service should return specific errors that can be mapped to HTTP statuses.
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize user registration"})
+            // IMPORTANT: The frontend should be programmed to delete the Firebase user on this error.
+            return
+        }
+
+        c.JSON(http.StatusCreated, createdTenant)
+    }
+}
+
+
 // handleListVaults is an example of a protected handler.
-// It receives the vaultService as a dependency (Dependency Injection).
 func handleListVaults(vaultService services.VaultService) gin.HandlerFunc {
     return func(c *gin.Context) {
         // 1. Retrieve the user and tenant ID from the context.
         // We can be sure these values exist and are valid because the middleware passed.
-        
-        // We use c.GetString() which is convenient. It returns an empty string if the key doesn't exist.
-        // For critical data like this, you could also use c.Get() and a type assertion for more safety.
         userID := c.GetString(string(middleware.UserIDContextKey))
         tenantID := c.GetString(string(middleware.TenantIDContextKey))
 
+        if tenantID == "" {
+             c.JSON(http.StatusForbidden, gin.H{"error": "User is not associated with a tenant"})
+             return
+        }
+
         // 2. Call the service layer, passing the request context and the necessary data.
         // The handler's job is to orchestrate, not to contain business logic.
-        // Notice we pass c.Request.Context(), which carries timeouts, cancellations, and our values.
         vaults, err := vaultService.ListVaultsForUser(c.Request.Context(), userID, tenantID)
         if err != nil {
             // The service layer should return appropriate errors.
@@ -168,19 +203,5 @@ func handleListVaults(vaultService services.VaultService) gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"vaults": vaults})
     }
 }
-
-/*
-// --- Example Service Method (in your services package) ---
-//
-// func (s *vaultService) ListVaultsForUser(ctx context.Context, userID, tenantID string) ([]Vault, error) {
-//     // Now, use userID and tenantID to:
-//     // 1. Perform OpenFGA checks to see what the user is allowed to view.
-//     // 2. Call the repository to fetch data from Firestore, e.g., from the path `/tenants/{tenantID}/vaults`.
-//     log.Printf("Service: Fetching vaults for user %s in tenant %s", userID, tenantID)
-//     
-//     // ... repository call ...
-//     return vaults, nil
-// }
-*/
 ```
-This layered approach is clean, secure, and highly scalable for building out your Go backend. The `handler` translates HTTP, and the `service` executes business logic, keeping concerns neatly separated.
+This layered approach is clean, secure, and highly scalable for building out your Go backend. The `handler` translates HTTP and authorizes, and the `service` executes business logic, keeping concerns neatly separated.
