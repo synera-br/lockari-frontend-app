@@ -5,7 +5,7 @@ import { BACKEND_URL } from '@/lib/firebase/config';
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-// Esta chave DEVE ser a mesma usada pelo backend e é enviada no cabeçalho X-Token.
+// This key MUST be the same one used by the backend and sent in the X-Token header.
 const SHARED_SECRET_BASE64 = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
@@ -15,17 +15,17 @@ try {
     if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
         console.warn(
-            `API Client Encryption WARN: A chave de criptografia decodificada de Base64 possui ${decodedKey.sigBytes} bytes. ` +
-            `O AES requer chaves de 16, 24 ou 32 bytes (128, 192 ou 256 bits). `
+            `API Client Encryption WARN: The Base64-decoded encryption key has ${decodedKey.sigBytes} bytes. ` +
+            `AES requires keys of 16, 24, or 32 bytes (128, 192, or 256 bits). `
         );
       }
     }
     encryptionKeyWordArray = decodedKey;
 } catch (e) {
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-      console.error("Falha ao parsear a chave de criptografia Base64. Usando uma chave padrão insegura. ISTO NÃO É PARA PRODUÇÃO.", e);
+      console.error("Failed to parse Base64 encryption key. Using an insecure fallback key. THIS IS NOT FOR PRODUCTION.", e);
     }
-    // Chave de 32 bytes para AES-256 para ambientes de desenvolvimento quando nenhuma chave é fornecida
+    // 32-byte key for AES-256 for dev environments when no key is provided
     encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"); 
 }
 
@@ -37,13 +37,13 @@ function generateTraceId(): string {
 }
 
 /**
- * Criptografa os dados para o formato esperado pelo backend Go: Base64(raw_iv_bytes + raw_ciphertext_bytes)
- * @param data O objeto a ser criptografado.
- * @returns Uma string Base64.
+ * Encrypts data to the format expected by the Go backend: Base64(raw_iv_bytes + raw_ciphertext_bytes)
+ * @param data The object to be encrypted.
+ * @returns A Base64 string.
  */
 function encryptData(data: any): string {
   const dataString = JSON.stringify(data);
-  const iv = CryptoJS.lib.WordArray.random(16); // IV de 16 bytes para AES
+  const iv = CryptoJS.lib.WordArray.random(16); // 16-byte IV for AES
 
   const encrypted = CryptoJS.AES.encrypt(dataString, encryptionKeyWordArray, {
     iv: iv,
@@ -57,9 +57,9 @@ function encryptData(data: any): string {
 }
 
 /**
- * Descriptografa um payload Base64 no formato: Base64(raw_iv_bytes + raw_ciphertext_bytes)
- * @param base64Payload A string Base64 recebida do servidor.
- * @returns O objeto original.
+ * Decrypts a Base64 payload in the format: Base64(raw_iv_bytes + raw_ciphertext_bytes)
+ * @param base64Payload The Base64 string received from the server.
+ * @returns The original object.
  */
 function decryptData(base64Payload: string): any {
   try {
@@ -84,15 +84,15 @@ function decryptData(base64Payload: string): any {
 
     const decryptedDataString = decrypted.toString(CryptoJS.enc.Utf8);
     if (!decryptedDataString) {
-      throw new Error("Falha ao descriptografar (Utf8): dados vazios após conversão.");
+      throw new Error("Decryption failed (Utf8): empty data after conversion.");
     }
     return JSON.parse(decryptedDataString);
   } catch (error) {
-    console.error("APIClient: Erro na descriptografia em decryptData:", error);
+    console.error("APIClient: Error during decryption in decryptData:", error);
     if (error instanceof SyntaxError) {
-        throw new Error("Falha ao fazer parse do JSON após descriptografar. Os dados podem estar corrompidos ou não são um JSON válido.");
+        throw new Error("Failed to parse JSON after decryption. Data may be corrupt or not valid JSON.");
     }
-    throw new Error("Falha ao processar resposta criptografada do servidor. Verifique a chave e o formato dos dados.");
+    throw new Error("Failed to process encrypted response from server. Check key and data format.");
   }
 }
 
@@ -103,15 +103,16 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   if (currentUser) {
     try {
-      token = await currentUser.getIdToken(true); // Forçar atualização para o token mais recente
+      // Force a token refresh to get the very latest token. This is crucial after login/signup.
+      token = await currentUser.getIdToken(true); 
     } catch (error) {
-      console.error("APIClient: Erro ao obter token de ID do Firebase:", error);
+      console.error("APIClient: Error getting Firebase ID token:", error);
     }
   }
 
   const headers = new Headers(options.headers || {});
   
-  // O backend espera este cabeçalho para obter a chave para descriptografia.
+  // The backend expects this header to get the key for decryption.
   headers.set('X-Token', SHARED_SECRET_BASE64);
 
   if (token) {
@@ -125,7 +126,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   headers.set('X-APP', APP_NAME);
   headers.set('X-TRACE-ID', traceId);
 
-  // Configurar AbortController para timeout
+  // Configure AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
@@ -139,7 +140,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       headers.set('Content-Type', 'application/json'); 
     } catch (error) {
       clearTimeout(timeoutId);
-      console.error("APIClient: Erro ao criptografar o corpo da requisição:", error);
+      console.error("APIClient: Error encrypting request body:", error);
       throw error;
     }
   }
@@ -150,12 +151,12 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   } catch (networkError: any) {
     clearTimeout(timeoutId);
     if (networkError.name === 'AbortError') {
-      console.error(`APIClient: A requisição para ${url} expirou após ${API_TIMEOUT / 1000}s.`);
-      throw new Error(`A requisição ao servidor expirou. Verifique se o backend está rodando e acessível em ${url}.`);
+      console.error(`APIClient: Request to ${url} timed out after ${API_TIMEOUT / 1000}s.`);
+      throw new Error(`Request to the server timed out. Please check if the backend is running and accessible at ${url}.`);
     }
-    console.error(`APIClient: Erro de rede durante o fetch para a URL: ${url}. Erro:`, networkError);
+    console.error(`APIClient: Network error during fetch to URL: ${url}. Error:`, networkError);
     throw new Error(
-      `Falha na comunicação com o servidor (${url}). Verifique sua conexão e se o servidor backend está acessível. Detalhes: ${networkError.message || 'Erro de rede desconhecido'}`
+      `Failed to communicate with the server (${url}). Check your connection and if the backend server is accessible. Details: ${networkError.message || 'Unknown network error'}`
     );
   } finally {
       clearTimeout(timeoutId);
@@ -179,7 +180,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       }
       return response;
     } catch (error) {
-      console.error("APIClient: Erro ao tentar processar/descriptografar resposta JSON:", error);
+      console.error("APIClient: Error attempting to process/decrypt JSON response:", error);
       return response;
     }
   }
