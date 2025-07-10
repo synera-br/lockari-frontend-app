@@ -106,65 +106,59 @@ function generateTraceId(): string {
  */
 function encryptData(data: any): string {
   try {
-    // Validação da entrada
     if (data === null || data === undefined) {
       throw new Error("Encrypt: data is null or undefined");
     }
-    
-    // Validar se a chave está inicializada
     if (!encryptionKeyWordArray || encryptionKeyWordArray.sigBytes === 0) {
       throw new Error("Encrypt: encryption key is not properly initialized");
     }
-    
     const dataString = JSON.stringify(data);
-    
-    // Validar se o JSON foi serializado corretamente
     if (!dataString || dataString === 'null' || dataString === 'undefined') {
       throw new Error("Encrypt: failed to serialize data to JSON");
     }
-    
-    // Gerar IV aleatório (16 bytes)
+
     const iv = CryptoJS.lib.WordArray.random(16);
-    
-    // Criptografar usando AES-CBC com PKCS7 padding
     const encrypted = CryptoJS.AES.encrypt(dataString, encryptionKeyWordArray, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7
     });
-    
-    // Validar se a criptografia foi bem-sucedida
+
     if (!encrypted || !encrypted.ciphertext || encrypted.ciphertext.sigBytes === 0) {
       throw new Error("Encrypt: encryption operation failed");
     }
-    
-    // Combinar IV + Ciphertext em bytes brutos
+
     const combined = iv.clone().concat(encrypted.ciphertext);
-    
-    // Converter para Base64 (formato esperado pelo backend)
     const base64Result = combined.toString(CryptoJS.enc.Base64);
-    
-    // Validação final do resultado
+
     if (!base64Result || base64Result.length === 0) {
       throw new Error("Encrypt: failed to generate Base64 output");
     }
-    
-    // Log para debug em desenvolvimento
+
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-      console.log('🔐 Encryption successful:', {
-        originalSize: dataString.length,
-        encryptedSize: base64Result.length,
-        ivSize: iv.sigBytes,
-        ciphertextSize: encrypted.ciphertext.sigBytes
-      });
+        console.groupCollapsed('🔒 FRONTEND ENCRYPTION DEBUG');
+        console.log('Original Data:', data);
+        console.log(`Original Size: ${dataString.length} bytes`);
+        console.log(`---`);
+        console.log(`Using Key (Base64): ${ENCRYPTION_KEY}`);
+        console.log(`Key (Hex): ${encryptionKeyWordArray.toString(CryptoJS.enc.Hex)}`);
+        console.log(`Key Size: ${encryptionKeyWordArray.sigBytes} bytes`);
+        console.log(`---`);
+        console.log(`IV (Hex): ${iv.toString(CryptoJS.enc.Hex)}`);
+        console.log(`IV Size: ${iv.sigBytes} bytes`);
+        console.log(`---`);
+        console.log(`Ciphertext Size: ${encrypted.ciphertext.sigBytes} bytes`);
+        console.log(`---`);
+        console.log(`Final Encrypted Payload (Base64):`, base64Result);
+        console.log(`Final Payload Size: ${base64Result.length} chars`);
+        console.groupEnd();
     }
     
     return base64Result;
     
   } catch (error) {
-    // Log detalhado para debug
     debugError("APIClient: Encryption error details:", {
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       dataType: typeof data,
       dataPreview: JSON.stringify(data)?.substring(0, 100) + "...",
       keyInfo: {
@@ -173,7 +167,6 @@ function encryptData(data: any): string {
       }
     });
     
-    // Re-throw com contexto adicional
     if (error instanceof Error) {
       throw error;
     }
