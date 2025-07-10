@@ -1,4 +1,5 @@
 
+
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
 import { BACKEND_URL } from '@/lib/firebase/config';
@@ -7,7 +8,7 @@ import { debugError, debugLog } from '@/lib/debug';
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-// This is the encryption key for payload encryption/decryption AND the X-Token header.
+// This is the encryption key for payload encryption/decryption
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
 
 if (!ENCRYPTION_KEY && process.env.NEXT_PUBLIC_MODE === 'develop') {
@@ -119,7 +120,8 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   const headers = new Headers(options.headers || {});
   
   // The backend expects this header for application authentication.
-  headers.set('X-Token', ENCRYPTION_KEY);
+  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "";
+  headers.set('X-Token', BACKEND_API_TOKEN);
 
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
