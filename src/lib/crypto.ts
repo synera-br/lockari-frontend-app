@@ -46,10 +46,13 @@ function cleanAndValidateKey(key: string): string {
 
 // Configurar a chave do ambiente
 export function getEncryptionKey(): string {
-  const key = process.env.NEXT_PUBLIC_ENCRYPT_KEY || process.env.ENCRYPT_KEY;
+  // Acessa a variável de ambiente. O prefixo NEXT_PUBLIC_ a torna disponível no navegador.
+  const key = process.env.NEXT_PUBLIC_ENCRYPT_KEY;
   
+  // Se a chave não for encontrada, lança um erro claro.
+  // Isso geralmente acontece se o servidor de desenvolvimento não foi reiniciado após a alteração do .env.local.
   if (!key) {
-    throw new Error('Encryption key not found. Please set NEXT_PUBLIC_ENCRYPT_KEY in your .env.local file.');
+    throw new Error('Encryption key not found. Please set NEXT_PUBLIC_ENCRYPT_KEY in your .env.local file and RESTART your development server.');
   }
   
   return cleanAndValidateKey(key);
