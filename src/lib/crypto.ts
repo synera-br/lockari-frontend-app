@@ -14,9 +14,11 @@ function cleanAndValidateKey(key: string): string {
     .replace(/\t/g, '')
     .trim();
   
-  console.log('DEBUG: Original key:', JSON.stringify(key));
-  console.log('DEBUG: Cleaned key:', JSON.stringify(cleanKey));
-  console.log('DEBUG: Key length:', cleanKey.length);
+  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+    console.log('DEBUG: Original key:', JSON.stringify(key));
+    console.log('DEBUG: Cleaned key:', JSON.stringify(cleanKey));
+    console.log('DEBUG: Key length:', cleanKey.length);
+  }
   
   if (!cleanKey) {
     throw new Error('Key is empty after cleaning');
@@ -27,7 +29,9 @@ function cleanAndValidateKey(key: string): string {
     const decoded = CryptoJS.enc.Base64.parse(cleanKey);
     const keySize = decoded.sigBytes;
     
-    console.log('DEBUG: Decoded key size:', keySize, 'bytes');
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('DEBUG: Decoded key size:', keySize, 'bytes');
+    }
     
     // Validar tamanhos AES suportados
     if (![16, 24, 32].includes(keySize)) {
@@ -45,7 +49,7 @@ export function getEncryptionKey(): string {
   const key = process.env.NEXT_PUBLIC_ENCRYPT_KEY || process.env.ENCRYPT_KEY;
   
   if (!key) {
-    throw new Error('ENCRYPT_KEY not found in environment variables. Please check your .env.local file.');
+    throw new Error('Encryption key not found. Please set NEXT_PUBLIC_ENCRYPT_KEY in your .env.local file.');
   }
   
   return cleanAndValidateKey(key);
