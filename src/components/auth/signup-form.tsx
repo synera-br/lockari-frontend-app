@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { auth } from '@/lib/firebase/config';
-import { auditAuthEvent } from '@/app/actions/auth';
+import { auditAuthEvent, signupUser } from '@/app/actions/auth';
 import type { Locale } from '@/middleware';
 import { Github, Loader2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
@@ -39,7 +39,12 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
   
   // Verificar se houve um redirect result ao carregar a página
   useEffect(() => {
+    let hasChecked = false;
+    
     const checkRedirectResult = async () => {
+      if (hasChecked) return;
+      hasChecked = true;
+      
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
         console.log('🔍 [DEBUG] Verificando redirect result ao carregar página...');
       }
@@ -80,23 +85,20 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
             }
             
             // Novo usuário via redirect
-            const auditResult = await auditAuthEvent({
-              eventType: 'SIGNUP_SUCCESS',
-              user: {
-                uid: result.user.uid,
-                email: result.user.email,
-                name: result.user.displayName || 'Google User',
-                plan: plan,
-              }
+            const signupResult = await signupUser({
+              uid: result.user.uid,
+              email: result.user.email,
+              name: result.user.displayName || 'Google User',
+              plan: plan,
             });
             
             if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-              console.log('📞 [DEBUG] RESPOSTA DO BACKEND (REDIRECT):', auditResult);
+              console.log('📞 [DEBUG] RESPOSTA DO BACKEND (REDIRECT):', signupResult);
             }
             
-            if (!auditResult.success) {
+            if (!signupResult.success) {
               if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-                console.error('❌ [DEBUG] Falha no audit após redirect - iniciando rollback');
+                console.error('❌ [DEBUG] Falha no signup após redirect - iniciando rollback');
               }
               try {
                 await result.user.delete();
@@ -108,9 +110,25 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
                   console.error('❌ [DEBUG] Falha no rollback após redirect:', deleteError);
                 }
               }
-              setError(auditResult.message || 'Falha ao criar conta.');
+              setError(signupResult.message || 'Falha ao criar conta.');
               setLoading(false);
               return;
+            }
+            
+            // Send audit event for successful redirect signup
+            try {
+              await auditAuthEvent({
+                eventType: 'SIGNUP_SUCCESS',
+                user: {
+                  uid: result.user.uid,
+                  email: result.user.email,
+                  name: result.user.displayName || 'Google User',
+                  plan: plan,
+                }
+              });
+            } catch (auditError) {
+              // Audit failure should not prevent successful signup
+              debugError('Audit event failed after successful redirect signup:', auditError);
             }
           } else {
             if (process.env.NEXT_PUBLIC_MODE === 'develop') {
@@ -147,7 +165,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
     };
     
     checkRedirectResult();
-  }, [lang, plan, router]);
+  }, []);
 
   const signupSchema = useMemo(() => {
     return z.object({
@@ -194,28 +212,42 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       // Step 2: Update user profile with name
       await updateProfile(userCredential.user, { displayName: data.name });
       
-      // Step 3: Notify backend to create tenant and user profile in Firestore.
-      // The frontend is no longer responsible for writing to Firestore.
-      debugLog(`User ${userCredential.user.uid} created in Firebase Auth. Notifying backend...`);
-      debugTime('Backend Audit Request');
-      const auditResult = await auditAuthEvent({
-        eventType: 'SIGNUP_SUCCESS',
-        user: {
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          name: data.name,
-          plan: data.plan
-        }
+      // Step 3: Create tenant and user profile in backend
+      debugLog(`User ${userCredential.user.uid} created in Firebase Auth. Creating tenant in backend...`);
+      debugTime('Backend Signup Request');
+      const signupResult = await signupUser({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        name: data.name,
+        plan: data.plan
       });
-      debugTimeEnd('Backend Audit Request');
+      debugTimeEnd('Backend Signup Request');
       
       // Step 4: Handle backend response. If it fails, throw an error to trigger the catch block for rollback.
-      if (!auditResult.success) {
-        debugError('Backend audit failed:', auditResult.message);
-        throw new Error(auditResult.message || 'Failed to create your account on our servers. Please try again.');
+      if (!signupResult.success) {
+        debugError('Backend signup failed:', signupResult.message);
+        throw new Error(signupResult.message || 'Failed to create your account on our servers. Please try again.');
       }
       
-      debugLog('Backend processing successful. Redirecting to dashboard...');
+      debugLog('Backend signup successful. Sending audit event...');
+      
+      // Step 5: Send audit event for successful signup
+      try {
+        await auditAuthEvent({
+          eventType: 'SIGNUP_SUCCESS',
+          user: {
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            name: data.name,
+            plan: data.plan
+          }
+        });
+      } catch (auditError) {
+        // Audit failure should not prevent successful signup
+        debugError('Audit event failed after successful signup:', auditError);
+      }
+      
+      debugLog('Signup process completed. Redirecting to dashboard...');
       router.push(`/${lang}/dashboard`);
 
     } catch (e: any) {
@@ -320,19 +352,16 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           console.log('🔍 [DEBUG] UID do novo usuário:', result.user.uid);
         }
         
-        // New user via Google. Notify backend to create tenant and profile.
-        const auditData = {
-          eventType: 'SIGNUP_SUCCESS' as const,
-          user: {
-            uid: result.user.uid,
-            email: result.user.email,
-            name: result.user.displayName || 'Google User',
-            plan: plan,
-          }
+        // New user via Google. Create tenant and profile in backend.
+        const signupData = {
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName || 'Google User',
+          plan: plan,
         };
         
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('🔍 [DEBUG] Enviando dados para backend:', auditData);
+          console.log('🔍 [DEBUG] Enviando dados para backend:', signupData);
           console.log('🔍 [DEBUG] URL do backend:', process.env.NEXT_PUBLIC_BACKEND_URL);
         }
         
@@ -340,18 +369,18 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           console.log('📞 [DEBUG] CHAMANDO BACKEND PARA REGISTRAR NOVO USUÁRIO...');
         }
         
-        const auditResult = await auditAuthEvent(auditData);
+        const signupResult = await signupUser(signupData);
         
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('📞 [DEBUG] RESPOSTA DO BACKEND RECEBIDA:', auditResult);
+          console.log('📞 [DEBUG] RESPOSTA DO BACKEND RECEBIDA:', signupResult);
         }
 
         // If backend tenant creation fails, roll back user creation in Auth.
-        if (!auditResult.success) {
+        if (!signupResult.success) {
           if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-            console.error('❌ [DEBUG] Backend audit falhou - iniciando rollback');
+            console.error('❌ [DEBUG] Backend signup falhou - iniciando rollback');
           }
-          debugError('Google signup backend audit failed:', auditResult.message);
+          debugError('Google signup backend failed:', signupResult.message);
           
           try {
             await result.user.delete();
@@ -366,7 +395,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
             debugError("Failed to roll back Google user creation:", deleteError);
           }
           
-          setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
+          setError(signupResult.message || 'Failed to create your account on our servers. Please try again.');
           setLoading(false);
           return;
         }
@@ -374,6 +403,22 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
           console.log('✅ [DEBUG] REGISTRO SOCIAL GOOGLE CONCLUÍDO COM SUCESSO!');
           console.log('🔍 [DEBUG] Usuário final no Firebase Auth:', auth.currentUser);
+        }
+        
+        // Send audit event for successful Google signup
+        try {
+          await auditAuthEvent({
+            eventType: 'SIGNUP_SUCCESS',
+            user: {
+              uid: result.user.uid,
+              email: result.user.email,
+              name: result.user.displayName || 'Google User',
+              plan: plan,
+            }
+          });
+        } catch (auditError) {
+          // Audit failure should not prevent successful signup
+          debugError('Audit event failed after successful Google signup:', auditError);
         }
 
       } else {
@@ -513,7 +558,18 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           <div className="flex-grow border-t border-muted" />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={handleGoogleSignIn} disabled={loading}><GoogleIcon /> Google</Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+                console.log('🔑 [DEBUG] BOTÃO GOOGLE CLICADO - INICIANDO handleGoogleSignIn');
+              }
+              handleGoogleSignIn();
+            }} 
+            disabled={loading}
+          >
+            <GoogleIcon /> Google
+          </Button>
           <Button variant="outline" disabled><Github className="mr-2 h-4 w-4" /> GitHub</Button>
         </div>
       </CardContent>
