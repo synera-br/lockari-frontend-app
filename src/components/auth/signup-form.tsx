@@ -141,39 +141,96 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+    
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      console.log('🔍 [DEBUG] Iniciando login social Google');
+    }
+    
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
+    
     try {
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔍 [DEBUG] Configurando popup Google OAuth');
+      }
+      
       const result = await signInWithPopup(auth, provider);
-      const isNewUser = getAdditionalUserInfo(result)?.isNewUser;
+      const additionalUserInfo = getAdditionalUserInfo(result);
+      const isNewUser = additionalUserInfo?.isNewUser;
+      
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔍 [DEBUG] Resultado do login Google:', {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          isNewUser: isNewUser,
+          additionalUserInfo: additionalUserInfo,
+          creationTime: result.user.metadata.creationTime,
+          lastSignInTime: result.user.metadata.lastSignInTime
+        });
+      }
       
       if (isNewUser) {
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('🔍 [DEBUG] Usuário identificado como NOVO - iniciando processo de registro');
+        }
+        
         // New user via Google. Notify backend to create tenant and profile.
-        const auditResult = await auditAuthEvent({
-          eventType: 'SIGNUP_SUCCESS',
+        const auditData = {
+          eventType: 'SIGNUP_SUCCESS' as const,
           user: {
             uid: result.user.uid,
             email: result.user.email,
             name: result.user.displayName || 'Google User',
-            plan: plan, // Use the plan from props
+            plan: plan,
           }
-        });
+        };
+        
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('🔍 [DEBUG] Enviando dados para backend:', auditData);
+          console.log('🔍 [DEBUG] URL do backend:', process.env.NEXT_PUBLIC_BACKEND_URL);
+        }
+        
+        const auditResult = await auditAuthEvent(auditData);
+        
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('🔍 [DEBUG] Resposta do backend:', auditResult);
+        }
 
         // If backend tenant creation fails, roll back user creation in Auth.
         if (!auditResult.success) {
-            debugError('Google signup backend audit failed:', auditResult.message);
-            try {
-              await result.user.delete();
-              debugLog('Google user rolled back successfully.');
-            } catch (deleteError) {
-              debugError("Failed to roll back Google user creation:", deleteError);
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.error('❌ [DEBUG] Backend audit falhou - iniciando rollback');
+          }
+          debugError('Google signup backend audit failed:', auditResult.message);
+          
+          try {
+            await result.user.delete();
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.log('🔍 [DEBUG] Usuário Google removido com sucesso (rollback)');
             }
-            setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
-            setLoading(false);
-            return;
+            debugLog('Google user rolled back successfully.');
+          } catch (deleteError) {
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.error('❌ [DEBUG] Falha no rollback do usuário Google:', deleteError);
+            }
+            debugError("Failed to roll back Google user creation:", deleteError);
+          }
+          
+          setError(auditResult.message || 'Failed to create your account on our servers. Please try again.');
+          setLoading(false);
+          return;
+        }
+        
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('✅ [DEBUG] Registro social Google concluído com sucesso');
         }
 
       } else {
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('🔍 [DEBUG] Usuário identificado como EXISTENTE - processando login');
+        }
+        
         // This is a login, not a signup. Just audit the login event.
         await auditAuthEvent({
           eventType: 'LOGIN_SUCCESS',
@@ -182,25 +239,52 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
             email: result.user.email,
           }
         });
+        
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('✅ [DEBUG] Login social Google concluído com sucesso');
+        }
+      }
+      
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔍 [DEBUG] Redirecionando para dashboard');
       }
       
       router.push(`/${lang}/dashboard`);
     } catch (e) {
       const authError = e as AuthError;
+      
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.error('❌ [DEBUG] Erro no login Google:', {
+          code: authError.code,
+          message: authError.message,
+          error: authError
+        });
+      }
+      
       switch (authError.code) {
         case 'auth/popup-closed-by-user':
-          // User closed the popup, do nothing.
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Usuário fechou popup - sem ação necessária');
+          }
           break;
         case 'auth/account-exists-with-different-credential':
           setError(dictionary.errorAccountExists);
           break;
+        case 'auth/cancelled-popup-request':
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Popup cancelado - sem ação necessária');
+          }
+          break;
+        case 'auth/popup-blocked':
+          setError('Popup foi bloqueado pelo navegador. Por favor, permita popups para este site.');
+          break;
         default:
-           // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
+          // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
           setError(dictionary.errorGoogleSignInFailed);
           debugError("Google Sign-In Error:", authError);
       }
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 

@@ -40,9 +40,20 @@ export async function auditAuthEvent(
     },
   };
   
+  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+    console.log('🔍 [DEBUG] Preparando audit event:', payload);
+  }
+  
   if (!BACKEND_URL) {
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      console.warn('⚠️ [DEBUG] BACKEND_URL não configurada - simulando audit event');
+    }
     debugLog('AUDIT EVENT (simulated - BACKEND_URL not set):', JSON.stringify(payload, null, 2));
     return { success: true, message: "Simulated audit event. BACKEND_URL not configured." };
+  }
+
+  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+    console.log('🔍 [DEBUG] Enviando para backend:', `${BACKEND_URL}/v1/audit/auth`);
   }
 
   try {
@@ -53,9 +64,28 @@ export async function auditAuthEvent(
       body: JSON.stringify(payload),
     });
 
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      console.log('🔍 [DEBUG] Resposta do backend:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
+      
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.error('❌ [DEBUG] Backend retornou erro:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        });
+      }
+      
       debugError('Backend returned an error for audit event:', response.status, errorText);
+      
       try {
         // Try to parse a structured error from the backend
         const errorJson = JSON.parse(errorText);
@@ -67,11 +97,24 @@ export async function auditAuthEvent(
     }
     
     // A successful audit call might return an empty body or a simple confirmation.
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      console.log('✅ [DEBUG] Audit event enviado com sucesso para o backend');
+    }
+    
     debugLog('Successfully sent audit event to backend.');
     return { success: true };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
+    
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      console.error('❌ [DEBUG] Erro na comunicação com backend:', {
+        message,
+        error,
+        backendUrl: BACKEND_URL
+      });
+    }
+    
     debugError('Error during fetchWithAuthHeaders for audit event:', message);
     return { success: false, message: `An unexpected error occurred while sending the audit event: ${message}` };
   }
