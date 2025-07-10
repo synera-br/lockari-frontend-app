@@ -58,18 +58,23 @@ export async function auditAuthEvent(
       // The api-client doesn't decrypt error responses.
       const errorText = await response.text();
       debugError('Failed to send audit event to backend:', response.status, errorText);
-      return { success: false, message: `Failed to send audit event: ${errorText}` };
+      // Attempt to parse the error text in case it's a JSON from our Go backend
+      try {
+        const errorJson = JSON.parse(errorText);
+        return { success: false, message: errorJson.error || 'Failed to send audit event.' };
+      } catch (e) {
+        return { success: false, message: `Failed to send audit event: ${errorText}` };
+      }
     }
     
     // The response from a successful audit might be empty or a simple confirmation.
     // The api-client will attempt to decrypt it if it has a payload.
     debugLog('Successfully sent audit event to backend.');
+    return { success: true };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
     debugError('Error sending audit event:', message);
     return { success: false, message: `An unexpected error occurred while sending the audit event: ${message}` };
   }
-
-  return { success: true };
 }

@@ -141,12 +141,29 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
     try {
       const originalBody = typeof newOptions.body === 'string' ? JSON.parse(newOptions.body) : newOptions.body;
       const encryptedPayloadString = encryptData(originalBody);
+      
+      // Debug logging em modo develop
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔐 APIClient: Payload original:', JSON.stringify(originalBody, null, 2));
+        console.log('🔐 APIClient: Payload criptografado:', encryptedPayloadString);
+      }
+      
       newOptions.body = JSON.stringify({ payload: encryptedPayloadString });
       headers.set('Content-Type', 'application/json'); 
     } catch (error) {
       clearTimeout(timeoutId);
       debugError("APIClient: Error encrypting request body:", error);
       throw error;
+    }
+  }
+
+  // Debug logging da requisição completa em modo develop
+  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+    console.log('🚀 APIClient: Enviando requisição para:', url);
+    console.log('🚀 APIClient: Headers:', Object.fromEntries(headers.entries()));
+    console.log('🚀 APIClient: Method:', newOptions.method || 'GET');
+    if (newOptions.body) {
+      console.log('🚀 APIClient: Body final:', newOptions.body);
     }
   }
 
