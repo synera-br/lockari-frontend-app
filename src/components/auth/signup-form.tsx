@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -154,7 +155,7 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
             uid: result.user.uid,
             email: result.user.email,
             name: result.user.displayName || 'Google User',
-            plan: 'free',
+            plan: plan, // Use the plan from props
           }
         });
 
