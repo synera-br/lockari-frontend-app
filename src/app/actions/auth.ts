@@ -22,8 +22,7 @@ interface AuditEventPayload {
 }
 
 /**
- * Sends an audit event to a backend service.
- * This now uses the encrypted fetch client.
+ * Sends an audit event to the backend using the centralized and encrypted API client.
  */
 export async function auditAuthEvent(
   data: Omit<AuditEventPayload, 'clientInfo' | 'timestamp'>
@@ -47,34 +46,33 @@ export async function auditAuthEvent(
   }
 
   try {
-    // The fetchWithAuthHeaders function will handle encryption and custom headers
+    // This now uses the centralized fetch client, which handles encryption,
+    // custom headers, timeouts, and debug logging automatically.
     const response = await fetchWithAuthHeaders(`${BACKEND_URL}/v1/audit/auth`, {
       method: 'POST',
-      body: JSON.stringify(payload), // The body will be encrypted by the client
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      // The response body might be encrypted, but for errors, it's often plain text.
-      // The api-client doesn't decrypt error responses.
       const errorText = await response.text();
-      debugError('Failed to send audit event to backend:', response.status, errorText);
-      // Attempt to parse the error text in case it's a JSON from our Go backend
+      debugError('Backend returned an error for audit event:', response.status, errorText);
       try {
+        // Try to parse a structured error from the backend
         const errorJson = JSON.parse(errorText);
         return { success: false, message: errorJson.error || 'Failed to send audit event.' };
       } catch (e) {
+        // If parsing fails, return the raw text
         return { success: false, message: `Failed to send audit event: ${errorText}` };
       }
     }
     
-    // The response from a successful audit might be empty or a simple confirmation.
-    // The api-client will attempt to decrypt it if it has a payload.
+    // A successful audit call might return an empty body or a simple confirmation.
     debugLog('Successfully sent audit event to backend.');
     return { success: true };
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
-    debugError('Error sending audit event:', message);
+    debugError('Error during fetchWithAuthHeaders for audit event:', message);
     return { success: false, message: `An unexpected error occurred while sending the audit event: ${message}` };
   }
 }
