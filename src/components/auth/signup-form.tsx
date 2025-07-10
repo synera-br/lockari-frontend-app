@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile, type AuthError, GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, type UserCredential } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, type AuthError, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, getAdditionalUserInfo, type UserCredential } from 'firebase/auth';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +36,80 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Verificar se houve um redirect result ao carregar a página
+  useEffect(() => {
+    const checkRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Redirect result encontrado:', result);
+          }
+          
+          setLoading(true);
+          const additionalUserInfo = getAdditionalUserInfo(result);
+          const isNewUser = additionalUserInfo?.isNewUser;
+          
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Processando resultado do redirect:', {
+              uid: result.user.uid,
+              email: result.user.email,
+              isNewUser: isNewUser
+            });
+          }
+          
+          if (isNewUser) {
+            // Novo usuário via redirect
+            const auditResult = await auditAuthEvent({
+              eventType: 'SIGNUP_SUCCESS',
+              user: {
+                uid: result.user.uid,
+                email: result.user.email,
+                name: result.user.displayName || 'Google User',
+                plan: plan,
+              }
+            });
+            
+            if (!auditResult.success) {
+              if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+                console.error('❌ [DEBUG] Falha no audit após redirect');
+              }
+              try {
+                await result.user.delete();
+              } catch (deleteError) {
+                if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+                  console.error('❌ [DEBUG] Falha no rollback após redirect:', deleteError);
+                }
+              }
+              setError(auditResult.message || 'Falha ao criar conta.');
+              setLoading(false);
+              return;
+            }
+          } else {
+            // Login de usuário existente via redirect
+            await auditAuthEvent({
+              eventType: 'LOGIN_SUCCESS',
+              user: {
+                uid: result.user.uid,
+                email: result.user.email,
+              }
+            });
+          }
+          
+          router.push(`/${lang}/dashboard`);
+        }
+      } catch (error) {
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.error('❌ [DEBUG] Erro ao processar redirect result:', error);
+        }
+        setError('Erro ao processar login. Tente novamente.');
+        setLoading(false);
+      }
+    };
+    
+    checkRedirectResult();
+  }, [lang, plan, router]);
 
   const signupSchema = useMemo(() => {
     return z.object({
@@ -147,13 +221,25 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
     }
     
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+    // Configurações mais específicas para evitar problemas de popup
+    provider.setCustomParameters({ 
+      prompt: 'select_account',
+      access_type: 'offline',
+      include_granted_scopes: 'true'
+    });
+    
+    // Adicionar escopos específicos
+    provider.addScope('email');
+    provider.addScope('profile');
     
     try {
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-        console.log('🔍 [DEBUG] Configurando popup Google OAuth');
+        console.log('🔍 [DEBUG] Configurando popup Google OAuth com configurações aprimoradas');
+        console.log('🔍 [DEBUG] Domínio atual:', window.location.origin);
+        console.log('🔍 [DEBUG] User agent:', navigator.userAgent);
       }
       
+      // Tentar com configurações específicas para evitar o erro de popup
       const result = await signInWithPopup(auth, provider);
       const additionalUserInfo = getAdditionalUserInfo(result);
       const isNewUser = additionalUserInfo?.isNewUser;
@@ -264,7 +350,23 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       switch (authError.code) {
         case 'auth/popup-closed-by-user':
           if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-            console.log('🔍 [DEBUG] Usuário fechou popup - sem ação necessária');
+            console.log('🔍 [DEBUG] Erro de popup - tentando redirect como fallback');
+          }
+          // Tentar com redirect como fallback
+          try {
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.log('🔍 [DEBUG] Iniciando login com redirect');
+            }
+            // Preservar o estado antes do redirect
+            sessionStorage.setItem('google-auth-attempt', 'true');
+            await signInWithRedirect(auth, provider);
+            // O redirect vai recarregar a página, então não precisamos fazer mais nada aqui
+            return;
+          } catch (redirectError) {
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.error('❌ [DEBUG] Falha no redirect também:', redirectError);
+            }
+            setError('Não foi possível conectar com o Google. Tente novamente.');
           }
           break;
         case 'auth/account-exists-with-different-credential':
@@ -276,7 +378,22 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           }
           break;
         case 'auth/popup-blocked':
-          setError('Popup foi bloqueado pelo navegador. Por favor, permita popups para este site.');
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Popup bloqueado - tentando redirect');
+          }
+          // Tentar com redirect quando popup for bloqueado
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectError) {
+            setError('Popup foi bloqueado. Por favor, permita popups para este site ou recarregue a página.');
+          }
+          break;
+        case 'auth/unauthorized-domain':
+          setError('Domínio não autorizado. Entre em contato com o suporte.');
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.error('❌ [DEBUG] Domínio não autorizado no Firebase Console');
+          }
           break;
         default:
           // This can happen due to misconfiguration (e.g., Authorized domains in Firebase).
