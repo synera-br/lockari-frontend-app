@@ -19,16 +19,19 @@ let encryptionKeyWordArray: CryptoJS.lib.WordArray;
  */
 function validateEncryptionKey(base64Key: string): { valid: boolean; error?: string; keyInfo?: any } {
   try {
+    // Validar se a chave não está vazia
     if (!base64Key || base64Key.trim() === '') {
       return { valid: false, error: "Key is empty or null" };
     }
 
+    // Validar formato Base64 (mesmo regex do backend)
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Key)) {
       return { valid: false, error: "Invalid Base64 format" };
     }
     
+    // Decodificar e validar tamanho
     const decodedKey = CryptoJS.enc.Base64.parse(base64Key);
-    const validSizes = [16, 24, 32];
+    const validSizes = [16, 24, 32]; // AES-128, AES-192, AES-256
     
     if (!validSizes.includes(decodedKey.sigBytes)) {
       return { 
@@ -59,12 +62,21 @@ const keyValidationResult = validateEncryptionKey(ENCRYPTION_KEY);
 if (keyValidationResult.valid) {
     debugInfo(`✅ Valid AES key loaded: ${keyValidationResult.keyInfo.type} (${keyValidationResult.keyInfo.size} bytes)`);
     encryptionKeyWordArray = CryptoJS.enc.Base64.parse(ENCRYPTION_KEY);
+    
+    // 🔍 LOGS DE DEBUG ADICIONAIS
+    debugInfo("🔑 FRONTEND DEBUG: Raw encryption key:", ENCRYPTION_KEY);
+    debugInfo("🔑 FRONTEND DEBUG: Key hex:", encryptionKeyWordArray.toString(CryptoJS.enc.Hex));
+    debugInfo("🔑 FRONTEND DEBUG: Key size:", encryptionKeyWordArray.sigBytes);
+    
 } else {
     debugError("❌ Failed to initialize encryption key:", keyValidationResult.error, keyValidationResult.keyInfo || '');
     
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
         debugWarn("🔧 Using fallback development key - THIS IS NOT FOR PRODUCTION!");
         encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
+        
+        // 🔍 LOG DA CHAVE DE FALLBACK
+        debugWarn("🔑 FRONTEND DEBUG: Using fallback key hex:", encryptionKeyWordArray.toString(CryptoJS.enc.Hex));
     } else {
         throw new Error(`Invalid encryption key configuration: ${keyValidationResult.error}. Application cannot start.`);
     }
@@ -85,52 +97,63 @@ function generateTraceId(): string {
  */
 function encryptData(data: any): string {
   try {
+    // Validação da entrada
     if (data === null || data === undefined) {
       throw new Error("Encrypt: data is null or undefined");
     }
     
+    // Validar se a chave está inicializada
     if (!encryptionKeyWordArray || encryptionKeyWordArray.sigBytes === 0) {
       throw new Error("Encrypt: encryption key is not properly initialized");
     }
     
     const dataString = JSON.stringify(data);
     
+    // Validar se o JSON foi serializado corretamente
     if (!dataString || dataString === 'null' || dataString === 'undefined') {
       throw new Error("Encrypt: failed to serialize data to JSON");
     }
     
+    // Gerar IV aleatório (16 bytes)
     const iv = CryptoJS.lib.WordArray.random(16);
     
+    // Criptografar usando AES-CBC com PKCS7 padding
     const encrypted = CryptoJS.AES.encrypt(dataString, encryptionKeyWordArray, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7
     });
     
+    // Validar se a criptografia foi bem-sucedida
     if (!encrypted || !encrypted.ciphertext || encrypted.ciphertext.sigBytes === 0) {
       throw new Error("Encrypt: encryption operation failed");
     }
     
+    // Combinar IV + Ciphertext em bytes brutos
     const combined = iv.clone().concat(encrypted.ciphertext);
+    
+    // Converter para Base64 (formato esperado pelo backend)
     const base64Result = combined.toString(CryptoJS.enc.Base64);
     
+    // Validação final do resultado
     if (!base64Result || base64Result.length === 0) {
       throw new Error("Encrypt: failed to generate Base64 output");
     }
     
+    // Log para debug em desenvolvimento
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-      debugLog('🔐 Encryption successful:', {
+      console.log('🔐 Encryption successful:', {
         originalSize: dataString.length,
         encryptedSize: base64Result.length,
         ivSize: iv.sigBytes,
         ciphertextSize: encrypted.ciphertext.sigBytes
       });
-      debugLog('Payload being sent to backend:', base64Result);
     }
     
     return base64Result;
     
-  } catch (error: any) {
+  } catch (error) {
+    // Log detalhado para debug
     debugError("APIClient: Encryption error details:", {
       error: error.message,
       dataType: typeof data,
@@ -141,6 +164,7 @@ function encryptData(data: any): string {
       }
     });
     
+    // Re-throw com contexto adicional
     if (error instanceof Error) {
       throw error;
     }
@@ -155,17 +179,20 @@ function encryptData(data: any): string {
  */
 function decryptData(base64Payload: string): any {
   try {
+    // Validação inicial do payload
     if (!base64Payload || base64Payload.trim() === '') {
       throw new Error("Decrypt: base64 payload is empty");
     }
 
+    // Validar se é um Base64 válido
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Payload)) {
       throw new Error("Decrypt: invalid Base64 format in payload");
     }
 
     const combined = CryptoJS.enc.Base64.parse(base64Payload);
     
-    const minSize = 16;
+    // Validação do tamanho mínimo (como no backend Go)
+    const minSize = 16; // AES block size (IV size)
     if (combined.sigBytes < minSize) {
       throw new Error(
         `Decrypt: combined payload too short to contain IV ` +
@@ -175,7 +202,8 @@ function decryptData(base64Payload: string): any {
     
     const combinedHex = combined.toString(CryptoJS.enc.Hex);
     
-    const ivSize = 32;
+    // Validar se o ciphertext tem tamanho válido (múltiplo do block size)
+    const ivSize = 32; // 16 bytes = 32 hex chars
     const ciphertextHex = combinedHex.substring(ivSize);
     const ciphertextSizeBytes = ciphertextHex.length / 2;
     
@@ -205,10 +233,12 @@ function decryptData(base64Payload: string): any {
 
     const decryptedDataString = decrypted.toString(CryptoJS.enc.Utf8);
     
+    // Validação mais rigorosa do resultado
     if (!decryptedDataString || decryptedDataString.length === 0) {
       throw new Error("Decryption failed: empty data after conversion (possible wrong key or corrupted data)");
     }
     
+    // Log para debug em desenvolvimento
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
       debugLog('--- API CLIENT RESPONSE ---');
       debugLog('Encrypted Payload:', base64Payload);
@@ -216,6 +246,7 @@ function decryptData(base64Payload: string): any {
       debugLog('---------------------------');
     }
     
+    // Tentar fazer parse do JSON
     try {
       return JSON.parse(decryptedDataString);
     } catch (jsonError) {
@@ -223,6 +254,7 @@ function decryptData(base64Payload: string): any {
     }
     
   } catch (error: any) {
+    // Log detalhado para debug
     debugError("APIClient: Decryption error details:", {
       error: error.message,
       payloadLength: base64Payload?.length || 0,
@@ -233,6 +265,7 @@ function decryptData(base64Payload: string): any {
       }
     });
     
+    // Re-throw com contexto adicional
     if (error instanceof Error) {
       throw error;
     }
@@ -309,16 +342,19 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       const responseBody = await clonedResponse.json();
       
       if (responseBody && typeof responseBody.payload === 'string') {
+        // Validar payload antes de descriptografar
         if (!responseBody.payload.trim()) {
           throw new Error("Server returned empty encrypted payload");
         }
         
+        // Validar formato Base64
         if (!/^[A-Za-z0-9+/]*={0,2}$/.test(responseBody.payload)) {
           throw new Error("Server returned invalid Base64 payload");
         }
         
         const decryptedData = decryptData(responseBody.payload);
         
+        // Validar se a descriptografia retornou dados válidos
         if (decryptedData === null || decryptedData === undefined) {
           throw new Error("Decryption resulted in null/undefined data");
         }
@@ -334,6 +370,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       }
       return response;
     } catch (error: any) {
+      // Log detalhado do erro
       debugError("APIClient: Response processing error:", {
         url: url,
         status: response.status,
@@ -342,6 +379,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
         traceId: traceId
       });
       
+      // Se o erro for de descriptografia, retornar erro mais específico
       if (error.message.includes('Decrypt:') || error.message.includes('decryption')) {
         throw new Error(`Failed to decrypt server response: ${error.message}`);
       }
