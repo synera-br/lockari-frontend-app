@@ -155,12 +155,41 @@ function encryptData(data: any): string {
  */
 function decryptData(base64Payload: string): any {
   try {
+    if (!base64Payload || base64Payload.trim() === '') {
+      throw new Error("Decrypt: base64 payload is empty");
+    }
+
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Payload)) {
+      throw new Error("Decrypt: invalid Base64 format in payload");
+    }
+
     const combined = CryptoJS.enc.Base64.parse(base64Payload);
+    
+    const minSize = 16;
+    if (combined.sigBytes < minSize) {
+      throw new Error(
+        `Decrypt: combined payload too short to contain IV ` +
+        `(got ${combined.sigBytes} bytes, expected at least ${minSize})`
+      );
+    }
+    
     const combinedHex = combined.toString(CryptoJS.enc.Hex);
     
-    const ivHex = combinedHex.substring(0, 32);
-    const ciphertextHex = combinedHex.substring(32);
-
+    const ivSize = 32;
+    const ciphertextHex = combinedHex.substring(ivSize);
+    const ciphertextSizeBytes = ciphertextHex.length / 2;
+    
+    if (ciphertextSizeBytes === 0) {
+      throw new Error("Decrypt: ciphertext is empty after IV extraction");
+    }
+    
+    if (ciphertextSizeBytes % 16 !== 0) {
+      throw new Error(
+        `Decrypt: ciphertext length (${ciphertextSizeBytes}) is not a multiple of AES block size (16)`
+      );
+    }
+    
+    const ivHex = combinedHex.substring(0, ivSize);
     const iv = CryptoJS.enc.Hex.parse(ivHex);
     const ciphertext = CryptoJS.enc.Hex.parse(ciphertextHex);
 
@@ -175,16 +204,39 @@ function decryptData(base64Payload: string): any {
     });
 
     const decryptedDataString = decrypted.toString(CryptoJS.enc.Utf8);
-    if (!decryptedDataString) {
-      throw new Error("Decryption failed (Utf8): empty data after conversion.");
+    
+    if (!decryptedDataString || decryptedDataString.length === 0) {
+      throw new Error("Decryption failed: empty data after conversion (possible wrong key or corrupted data)");
     }
-    return JSON.parse(decryptedDataString);
-  } catch (error) {
-    debugError("APIClient: Error during decryption in decryptData:", error);
-    if (error instanceof SyntaxError) {
-        throw new Error("Failed to parse JSON after decryption. Data may be corrupt or not valid JSON.");
+    
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+      debugLog('--- API CLIENT RESPONSE ---');
+      debugLog('Encrypted Payload:', base64Payload);
+      debugLog('Decrypted Data:', decryptedDataString);
+      debugLog('---------------------------');
     }
-    throw new Error("Failed to process encrypted response from server. Check key and data format.");
+    
+    try {
+      return JSON.parse(decryptedDataString);
+    } catch (jsonError) {
+      throw new Error("Failed to parse JSON after decryption. Data may be corrupt or not valid JSON.");
+    }
+    
+  } catch (error: any) {
+    debugError("APIClient: Decryption error details:", {
+      error: error.message,
+      payloadLength: base64Payload?.length || 0,
+      payloadPreview: base64Payload?.substring(0, 50) + "...",
+      keyInfo: {
+        keySize: encryptionKeyWordArray?.sigBytes || 0,
+        keyPreview: ENCRYPTION_KEY?.substring(0, 20) + "..."
+      }
+    });
+    
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error("Unexpected error during decryption: " + String(error));
   }
 }
 
