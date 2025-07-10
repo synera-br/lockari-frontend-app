@@ -40,11 +40,26 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
   // Verificar se houve um redirect result ao carregar a página
   useEffect(() => {
     const checkRedirectResult = async () => {
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔍 [DEBUG] Verificando redirect result ao carregar página...');
+      }
+      
       try {
         const result = await getRedirectResult(auth);
+        
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('🔍 [DEBUG] Resultado do getRedirectResult:', result);
+        }
+        
         if (result) {
           if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-            console.log('🔍 [DEBUG] Redirect result encontrado:', result);
+            console.log('✨ [DEBUG] REDIRECT RESULT ENCONTRADO - PROCESSANDO...');
+            console.log('🔍 [DEBUG] Detalhes do redirect result:', {
+              uid: result.user.uid,
+              email: result.user.email,
+              displayName: result.user.displayName,
+              metadata: result.user.metadata
+            });
           }
           
           setLoading(true);
@@ -60,6 +75,10 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           }
           
           if (isNewUser) {
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.log('✨ [DEBUG] NOVO USUÁRIO VIA REDIRECT - REGISTRANDO...');
+            }
+            
             // Novo usuário via redirect
             const auditResult = await auditAuthEvent({
               eventType: 'SIGNUP_SUCCESS',
@@ -71,12 +90,19 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
               }
             });
             
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.log('📞 [DEBUG] RESPOSTA DO BACKEND (REDIRECT):', auditResult);
+            }
+            
             if (!auditResult.success) {
               if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-                console.error('❌ [DEBUG] Falha no audit após redirect');
+                console.error('❌ [DEBUG] Falha no audit após redirect - iniciando rollback');
               }
               try {
                 await result.user.delete();
+                if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+                  console.log('🔍 [DEBUG] Rollback após redirect concluído');
+                }
               } catch (deleteError) {
                 if (process.env.NEXT_PUBLIC_MODE === 'develop') {
                   console.error('❌ [DEBUG] Falha no rollback após redirect:', deleteError);
@@ -87,6 +113,10 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
               return;
             }
           } else {
+            if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+              console.log('🔄 [DEBUG] USUÁRIO EXISTENTE VIA REDIRECT - FAZENDO LOGIN...');
+            }
+            
             // Login de usuário existente via redirect
             await auditAuthEvent({
               eventType: 'LOGIN_SUCCESS',
@@ -97,7 +127,15 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
             });
           }
           
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('✅ [DEBUG] REDIRECT PROCESSADO COM SUCESSO - REDIRECIONANDO PARA DASHBOARD');
+          }
+          
           router.push(`/${lang}/dashboard`);
+        } else {
+          if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+            console.log('🔍 [DEBUG] Nenhum redirect result encontrado - processo normal');
+          }
         }
       } catch (error) {
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
@@ -241,24 +279,45 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
       
       // Tentar com configurações específicas para evitar o erro de popup
       const result = await signInWithPopup(auth, provider);
+      
+      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        console.log('🔍 [DEBUG] SignInWithPopup completado com sucesso!');
+        console.log('🔍 [DEBUG] Usuário autenticado:', {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          emailVerified: result.user.emailVerified,
+          photoURL: result.user.photoURL,
+          providerData: result.user.providerData,
+          metadata: {
+            creationTime: result.user.metadata.creationTime,
+            lastSignInTime: result.user.metadata.lastSignInTime
+          }
+        });
+      }
+      
       const additionalUserInfo = getAdditionalUserInfo(result);
       const isNewUser = additionalUserInfo?.isNewUser;
       
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-        console.log('🔍 [DEBUG] Resultado do login Google:', {
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
+        console.log('🔍 [DEBUG] Informações adicionais do usuário:', {
           isNewUser: isNewUser,
-          additionalUserInfo: additionalUserInfo,
-          creationTime: result.user.metadata.creationTime,
-          lastSignInTime: result.user.metadata.lastSignInTime
+          providerId: additionalUserInfo?.providerId,
+          profile: additionalUserInfo?.profile,
+          username: additionalUserInfo?.username,
+          additionalUserInfo: additionalUserInfo
         });
+        
+        // Verificar se o usuário realmente foi criado no Firebase Auth
+        console.log('🔍 [DEBUG] Verificando se usuário existe no Firebase Auth...');
+        console.log('🔍 [DEBUG] Current auth user:', auth.currentUser);
       }
       
       if (isNewUser) {
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('🔍 [DEBUG] Usuário identificado como NOVO - iniciando processo de registro');
+          console.log('✨ [DEBUG] USUÁRIO IDENTIFICADO COMO NOVO - INICIANDO PROCESSO DE REGISTRO');
+          console.log('🔍 [DEBUG] Verificando se usuário foi realmente criado no Firebase Auth...');
+          console.log('🔍 [DEBUG] UID do novo usuário:', result.user.uid);
         }
         
         // New user via Google. Notify backend to create tenant and profile.
@@ -277,10 +336,14 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
           console.log('🔍 [DEBUG] URL do backend:', process.env.NEXT_PUBLIC_BACKEND_URL);
         }
         
+        if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+          console.log('📞 [DEBUG] CHAMANDO BACKEND PARA REGISTRAR NOVO USUÁRIO...');
+        }
+        
         const auditResult = await auditAuthEvent(auditData);
         
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('🔍 [DEBUG] Resposta do backend:', auditResult);
+          console.log('📞 [DEBUG] RESPOSTA DO BACKEND RECEBIDA:', auditResult);
         }
 
         // If backend tenant creation fails, roll back user creation in Auth.
@@ -309,12 +372,14 @@ export function SignupForm({ lang, dictionary, plan }: SignupFormProps) {
         }
         
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('✅ [DEBUG] Registro social Google concluído com sucesso');
+          console.log('✅ [DEBUG] REGISTRO SOCIAL GOOGLE CONCLUÍDO COM SUCESSO!');
+          console.log('🔍 [DEBUG] Usuário final no Firebase Auth:', auth.currentUser);
         }
 
       } else {
         if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-          console.log('🔍 [DEBUG] Usuário identificado como EXISTENTE - processando login');
+          console.log('🔄 [DEBUG] USUÁRIO IDENTIFICADO COMO EXISTENTE - PROCESSANDO LOGIN');
+          console.log('🔍 [DEBUG] UID do usuário existente:', result.user.uid);
         }
         
         // This is a login, not a signup. Just audit the login event.
