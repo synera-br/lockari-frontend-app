@@ -3,38 +3,53 @@
 import { auth } from '@/lib/firebase/config';
 import CryptoJS from 'crypto-js';
 import { BACKEND_URL } from '@/lib/firebase/config';
-import { debugError, debugLog } from '@/lib/debug';
+import { debugError, debugLog, debugWarn, debugInfo } from '@/lib/debug';
 
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-// This is the encryption key for payload encryption/decryption
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
-
-if (!ENCRYPTION_KEY && process.env.NEXT_PUBLIC_MODE === 'develop') {
-  console.warn("API Client: NEXT_PUBLIC_ENCRYPTION_KEY is not set. Backend requests will likely fail.");
-}
+const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "";
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
 
 try {
+    if (!ENCRYPTION_KEY) {
+        throw new Error("NEXT_PUBLIC_ENCRYPTION_KEY is not defined in the environment variables.");
+    }
+    
     const decodedKey = CryptoJS.enc.Base64.parse(ENCRYPTION_KEY);
+    
+    // Strict validation like the Go backend
     if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
-      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-        console.warn(
-            `API Client Encryption WARN: The Base64-decoded encryption key has ${decodedKey.sigBytes} bytes. ` +
-            `AES requires keys of 16, 24, or 32 bytes (128, 192, or 256 bits). `
+        throw new Error(
+            `Invalid AES key size: ${decodedKey.sigBytes} bytes (must be 16, 24, or 32 bytes). ` +
+            `Current key in Base64 starts with: ${ENCRYPTION_KEY.substring(0, 20)}...`
         );
-      }
     }
+    
+    debugInfo(`✅ Valid AES key loaded: ${decodedKey.sigBytes} bytes (${decodedKey.sigBytes * 8} bits)`);
+    
     encryptionKeyWordArray = decodedKey;
-} catch (e) {
+
+} catch (e: any) {
+    // Detailed error logging for debugging
+    debugError("❌ Failed to initialize encryption key:", e.message);
+    
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-      console.error("Failed to parse Base64 encryption key. Using an insecure fallback key. THIS IS NOT FOR PRODUCTION.", e);
+        debugError("Key analysis:", {
+            provided: ENCRYPTION_KEY,
+            length: ENCRYPTION_KEY.length,
+            isValidBase64: /^[A-Za-z0-9+/]*={0,2}$/.test(ENCRYPTION_KEY)
+        });
+        // Use fallback key only in development
+        debugWarn("🔧 Using fallback development key - THIS IS NOT FOR PRODUCTION!");
+        encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
+    } else {
+        // In production, fail completely
+        throw new Error("Invalid encryption key configuration. Application cannot start.");
     }
-    // 32-byte key for AES-256 for dev environments when no key is provided
-    encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"); 
 }
+
 
 function generateTraceId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -120,8 +135,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   const headers = new Headers(options.headers || {});
   
   // The backend expects this header for application authentication.
-  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "";
-  headers.set('X-Token', BACKEND_API_TOKEN);
+  headers.set('X-Token', ENCRYPTION_KEY);
 
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
@@ -141,11 +155,11 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       const originalBody = typeof newOptions.body === 'string' ? JSON.parse(newOptions.body) : newOptions.body;
       const encryptedPayloadString = encryptData(originalBody);
       
-      // Debug logging em modo develop
-      if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-        console.log('🔐 APIClient: Payload original:', JSON.stringify(originalBody, null, 2));
-        console.log('🔐 APIClient: Payload criptografado:', encryptedPayloadString);
-      }
+      debugLog('--- API CLIENT REQUEST ---');
+      debugLog('URL:', url);
+      debugLog('Original Payload:', originalBody);
+      debugLog('Encrypted Payload:', encryptedPayloadString);
+      debugLog('------------------------');
       
       newOptions.body = JSON.stringify({ payload: encryptedPayloadString });
       headers.set('Content-Type', 'application/json'); 
@@ -153,16 +167,6 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       clearTimeout(timeoutId);
       debugError("APIClient: Error encrypting request body:", error);
       throw error;
-    }
-  }
-
-  // Debug logging da requisição completa em modo develop
-  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-    console.log('🚀 APIClient: Enviando requisição para:', url);
-    console.log('🚀 APIClient: Headers:', Object.fromEntries(headers.entries()));
-    console.log('🚀 APIClient: Method:', newOptions.method || 'GET');
-    if (newOptions.body) {
-      console.log('🚀 APIClient: Body final:', newOptions.body);
     }
   }
 
