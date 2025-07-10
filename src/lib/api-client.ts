@@ -6,15 +6,21 @@ import { debugError, debugLog } from '@/lib/debug';
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-// This is the SINGLE SOURCE OF TRUTH for the shared secret.
-// It is used for both encryption and for the X-Token header.
-const SHARED_SECRET_BASE64 = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
+// This is the encryption key for payload encryption/decryption
+const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "VGhpc0lzQTE2Qnl0ZUtleVRoaXNJc0ExNkJ5dGVJVgo="; 
+
+// This is the JWT token for backend authentication
+const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || ""; 
+
+if (!BACKEND_API_TOKEN && process.env.NEXT_PUBLIC_MODE === 'develop') {
+  console.warn("API Client: BACKEND_API_TOKEN is not set. Backend requests may fail.");
+}
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
 
 try {
     debugLog(`API Client: Using encryption key from env var.`);
-    const decodedKey = CryptoJS.enc.Base64.parse(SHARED_SECRET_BASE64);
+    const decodedKey = CryptoJS.enc.Base64.parse(ENCRYPTION_KEY);
     if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
       if (process.env.NEXT_PUBLIC_MODE === 'develop') {
         console.warn(
@@ -115,15 +121,11 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   const headers = new Headers(options.headers || {});
   
-  // The backend expects this header to get the key for decryption.
-  headers.set('X-Token', SHARED_SECRET_BASE64);
+  // The backend expects this header for application authentication.
+  headers.set('X-Token', BACKEND_API_TOKEN);
 
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
-  }
-  
-  if (currentUser?.uid) {
-    headers.set('X-USERID', currentUser.uid);
   }
 
   headers.set('X-APP', APP_NAME);
