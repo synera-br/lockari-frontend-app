@@ -1,13 +1,8 @@
+
 import { auth } from '@/lib/firebase/config';
 import { BACKEND_URL } from '@/lib/firebase/config';
 import { debugError, debugInfo } from '@/lib/debug';
-import { CryptoCBC } from './crypto-cbc';
-
-// Initial environment variable check
-debugInfo("🔍 Environment check:", {
-    hasEncryptionKey: !!(process.env.NEXT_PUBLIC_ENCRYPT_KEY || process.env.ENCRYPT_KEY),
-    mode: process.env.NEXT_PUBLIC_MODE
-});
+import { encrypt, decrypt } from './crypto';
 
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
@@ -43,20 +38,17 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   headers.set('X-APP', APP_NAME);
   headers.set('X-TRACE-ID', traceId);
+  headers.set('Content-Type', 'application/json');
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   const newOptions: RequestInit = { ...options, headers, signal: controller.signal };
 
-  // Encrypt body if present for relevant methods
   if (newOptions.body && (newOptions.method === 'POST' || newOptions.method === 'PUT' || newOptions.method === 'PATCH')) {
     try {
-      const originalBodyString = typeof newOptions.body === 'string' ? newOptions.body : JSON.stringify(newOptions.body);
-      const encryptedPayloadString = CryptoCBC.encrypt(originalBodyString);
-      
+      const encryptedPayloadString = encrypt(JSON.parse(newOptions.body as string));
       newOptions.body = JSON.stringify({ payload: encryptedPayloadString });
-      headers.set('Content-Type', 'application/json'); 
     } catch (error) {
       clearTimeout(timeoutId);
       debugError("APIClient: Error encrypting request body:", error);
@@ -84,15 +76,13 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
       clearTimeout(timeoutId);
   }
   
-  // Decrypt response body if present and encrypted
   if (response.ok && response.headers.get('Content-Type')?.includes('application/json')) {
     const clonedResponse = response.clone(); 
     try {
       const responseBody = await clonedResponse.json();
       
       if (responseBody && typeof responseBody.payload === 'string') {
-        const decryptedDataString = CryptoCBC.decrypt(responseBody.payload);
-        const decryptedData = JSON.parse(decryptedDataString);
+        const decryptedData = decrypt(responseBody.payload);
         
         const newHeaders = new Headers(response.headers);
         newHeaders.set('Content-Type', 'application/json');
@@ -103,7 +93,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
           headers: newHeaders,
         });
       }
-      return response; // Return original response if payload is not encrypted
+      return response;
     } catch (error: any) {
       debugError("APIClient: Response processing error:", {
         url: url,

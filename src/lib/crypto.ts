@@ -1,59 +1,147 @@
+
 // lib/crypto.ts
 import CryptoJS from 'crypto-js';
+import { debugError, debugInfo, debugLog } from './debug';
 
-// Função para limpar e validar a chave (igual ao backend)
-function cleanAndValidateKey(key: string): string {
-  if (!key) {
-    throw new Error('Encryption key is empty');
-  }
-  
-  // Limpeza AGRESSIVA (igual ao backend Go)
-  let cleanKey = key
-    .replace(/\n/g, '')
-    .replace(/\r/g, '')
-    .replace(/\t/g, '')
-    .trim();
-  
-  if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-    console.log('DEBUG: Original key:', JSON.stringify(key));
-    console.log('DEBUG: Cleaned key:', JSON.stringify(cleanKey));
-    console.log('DEBUG: Key length:', cleanKey.length);
-  }
-  
-  if (!cleanKey) {
-    throw new Error('Key is empty after cleaning');
-  }
-  
-  // Validar se é Base64 válido
+let encryptionKeyWordArray: CryptoJS.lib.WordArray | null = null;
+let rawEncryptionKey: string | null = null;
+
+/**
+ * Validates a Base64 encoded key for proper format and AES-compatible size.
+ */
+function validateEncryptionKey(base64Key: string): { valid: boolean; error?: string; keyInfo?: any } {
   try {
-    const decoded = CryptoJS.enc.Base64.parse(cleanKey);
-    const keySize = decoded.sigBytes;
-    
-    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-        console.log('DEBUG: Decoded key size:', keySize, 'bytes');
+    if (!base64Key || base64Key.trim() === '') {
+      return { valid: false, error: "Key is empty or null" };
     }
-    
-    // Validar tamanhos AES suportados
-    if (![16, 24, 32].includes(keySize)) {
-      throw new Error(`Invalid AES key size: ${keySize} bytes (must be 16, 24, or 32)`);
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Key)) {
+      return { valid: false, error: "Invalid Base64 format" };
     }
-    
-    return cleanKey;
+    const decodedKey = CryptoJS.enc.Base64.parse(base64Key);
+    const validSizes = [16, 24, 32];
+    if (!validSizes.includes(decodedKey.sigBytes)) {
+      return { 
+        valid: false, 
+        error: `Invalid key size: ${decodedKey.sigBytes} bytes (must be 16, 24, or 32)`,
+        keyInfo: { size: decodedKey.sigBytes, validSizes }
+      };
+    }
+    return { 
+      valid: true, 
+      keyInfo: { 
+        size: decodedKey.sigBytes, 
+        bits: decodedKey.sigBytes * 8,
+        type: decodedKey.sigBytes === 16 ? 'AES-128' : 
+              decodedKey.sigBytes === 24 ? 'AES-192' : 'AES-256'
+      }
+    };
   } catch (error: any) {
-    throw new Error(`Invalid Base64 key: ${error.message}`);
+    return { valid: false, error: `Key validation failed: ${error.message}` };
   }
 }
 
-// Configurar a chave do ambiente
-export function getEncryptionKey(): string {
-  // Acessa a variável de ambiente. O prefixo NEXT_PUBLIC_ a torna disponível no navegador.
-  const key = process.env.NEXT_PUBLIC_ENCRYPT_KEY;
-  
-  // Se a chave não for encontrada, lança um erro claro.
-  // Isso geralmente acontece se o servidor de desenvolvimento não foi reiniciado após a alteração do .env.local.
-  if (!key) {
-    throw new Error('Encryption key not found. Please set NEXT_PUBLIC_ENCRYPT_KEY in your .env.local file and RESTART your development server.');
+/**
+ * Initializes the encryption module by reading and validating the key from environment variables.
+ * This function is called automatically when the module is loaded.
+ */
+function initializeKey() {
+  debugInfo("🔍 Environment check:", {
+      hasEncryptionKey: !!process.env.NEXT_PUBLIC_ENCRYPT_KEY,
+      keyLength: process.env.NEXT_PUBLIC_ENCRYPT_KEY?.length || 0,
+      mode: process.env.NEXT_PUBLIC_MODE
+  });
+
+  const keyFromEnv = process.env.NEXT_PUBLIC_ENCRYPT_KEY;
+
+  if (!keyFromEnv) {
+    debugError("❌ Encryption key (NEXT_PUBLIC_ENCRYPT_KEY) not found in environment.");
+    return;
   }
   
-  return cleanAndValidateKey(key);
+  rawEncryptionKey = keyFromEnv.trim().replace(/\s/g, '');
+  const keyValidationResult = validateEncryptionKey(rawEncryptionKey);
+
+  if (keyValidationResult.valid) {
+    debugInfo(`✅ Valid AES key loaded: ${keyValidationResult.keyInfo.type} (${keyValidationResult.keyInfo.size} bytes)`);
+    encryptionKeyWordArray = CryptoJS.enc.Base64.parse(rawEncryptionKey);
+  } else {
+    debugError("❌ Failed to initialize encryption key:", keyValidationResult.error, keyValidationResult.keyInfo || '');
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        debugError("🔧 USING FALLBACK DEVELOPMENT KEY - THIS IS NOT FOR PRODUCTION!");
+        encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
+    }
+  }
+}
+
+// Initialize the key when the module is first imported.
+initializeKey();
+
+/**
+ * Encrypts a data object into a Base64 string using AES-CBC.
+ */
+export function encrypt(data: any): string {
+  if (!encryptionKeyWordArray) {
+    throw new Error('Encryption key is not initialized. Please check your NEXT_PUBLIC_ENCRYPT_KEY environment variable and restart the server.');
+  }
+
+  try {
+    const dataString = JSON.stringify(data);
+    const iv = CryptoJS.lib.WordArray.random(16); // 128-bit IV
+
+    const encrypted = CryptoJS.AES.encrypt(dataString, encryptionKeyWordArray, {
+      iv: iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7
+    });
+
+    const combined = iv.clone().concat(encrypted.ciphertext);
+    const base64Result = combined.toString(CryptoJS.enc.Base64);
+
+    if (process.env.NEXT_PUBLIC_MODE === 'develop') {
+        debugLog('--- ENCRYPTION ---', {
+            ivHex: iv.toString(CryptoJS.enc.Hex),
+            payload: base64Result,
+        });
+    }
+    
+    return base64Result;
+  } catch (error) {
+    debugError("Encryption failed:", error);
+    throw new Error("Encryption failed. See console for details.");
+  }
+}
+
+/**
+ * Decrypts a Base64 string using AES-CBC into its original data.
+ */
+export function decrypt(encryptedData: string): any {
+  if (!encryptionKeyWordArray) {
+    throw new Error('Encryption key is not initialized for decryption.');
+  }
+
+  try {
+    const combinedBytes = CryptoJS.enc.Base64.parse(encryptedData);
+    if (combinedBytes.sigBytes < 16) {
+      throw new Error("Invalid encrypted data: too short.");
+    }
+
+    const iv = CryptoJS.lib.WordArray.create(combinedBytes.words.slice(0, 4), 16);
+    const ciphertext = CryptoJS.lib.WordArray.create(combinedBytes.words.slice(4), combinedBytes.sigBytes - 16);
+
+    const decrypted = CryptoJS.AES.decrypt({ ciphertext } as any, encryptionKeyWordArray, {
+      iv: iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7
+    });
+
+    const decryptedString = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!decryptedString) {
+      throw new Error("Decryption resulted in empty data (possible wrong key).");
+    }
+
+    return JSON.parse(decryptedString);
+  } catch (error) {
+    debugError("Decryption failed:", error);
+    throw new Error("Decryption failed. See console for details.");
+  }
 }
