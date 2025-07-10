@@ -125,13 +125,14 @@ function encryptData(data: any): string {
         ivSize: iv.sigBytes,
         ciphertextSize: encrypted.ciphertext.sigBytes
       });
+      debugLog('Payload being sent to backend:', base64Result);
     }
     
     return base64Result;
     
-  } catch (error) {
+  } catch (error: any) {
     debugError("APIClient: Encryption error details:", {
-      error: error instanceof Error ? error.message : String(error),
+      error: error.message,
       dataType: typeof data,
       dataPreview: JSON.stringify(data)?.substring(0, 100) + "...",
       keyInfo: {
@@ -232,6 +233,9 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   let response: Response;
   try {
+    if (!BACKEND_URL) {
+      throw new Error("Backend URL is not configured. Please set NEXT_PUBLIC_BACKEND_URL.");
+    }
     response = await fetch(url, newOptions);
   } catch (networkError: any) {
     clearTimeout(timeoutId);
@@ -251,12 +255,25 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
     const clonedResponse = response.clone(); 
     try {
       const responseBody = await clonedResponse.json();
+      
       if (responseBody && typeof responseBody.payload === 'string') {
+        if (!responseBody.payload.trim()) {
+          throw new Error("Server returned empty encrypted payload");
+        }
+        
+        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(responseBody.payload)) {
+          throw new Error("Server returned invalid Base64 payload");
+        }
+        
         const decryptedData = decryptData(responseBody.payload);
+        
+        if (decryptedData === null || decryptedData === undefined) {
+          throw new Error("Decryption resulted in null/undefined data");
+        }
         
         const newHeaders = new Headers(response.headers);
         newHeaders.set('Content-Type', 'application/json');
-
+  
         return new Response(JSON.stringify(decryptedData), {
           status: response.status,
           statusText: response.statusText,
@@ -264,9 +281,20 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
         });
       }
       return response;
-    } catch (error) {
-      debugError("APIClient: Error attempting to process/decrypt JSON response:", error);
-      return response;
+    } catch (error: any) {
+      debugError("APIClient: Response processing error:", {
+        url: url,
+        status: response.status,
+        contentType: response.headers.get('Content-Type'),
+        error: error.message,
+        traceId: traceId
+      });
+      
+      if (error.message.includes('Decrypt:') || error.message.includes('decryption')) {
+        throw new Error(`Failed to decrypt server response: ${error.message}`);
+      }
+      
+      throw error;
     }
   }
 
