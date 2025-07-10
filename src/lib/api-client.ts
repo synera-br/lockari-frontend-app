@@ -19,7 +19,6 @@ try {
     
     const decodedKey = CryptoJS.enc.Base64.parse(ENCRYPTION_KEY);
     
-    // Strict validation like the Go backend
     if (decodedKey.sigBytes !== 16 && decodedKey.sigBytes !== 24 && decodedKey.sigBytes !== 32) {
         throw new Error(
             `Invalid AES key size: ${decodedKey.sigBytes} bytes (must be 16, 24, or 32 bytes). ` +
@@ -32,7 +31,6 @@ try {
     encryptionKeyWordArray = decodedKey;
 
 } catch (e: any) {
-    // Detailed error logging for debugging
     debugError("❌ Failed to initialize encryption key:", e.message);
     
     if (process.env.NEXT_PUBLIC_MODE === 'develop') {
@@ -41,11 +39,9 @@ try {
             length: ENCRYPTION_KEY.length,
             isValidBase64: /^[A-Za-z0-9+/]*={0,2}$/.test(ENCRYPTION_KEY)
         });
-        // Use fallback key only in development
         debugWarn("🔧 Using fallback development key - THIS IS NOT FOR PRODUCTION!");
         encryptionKeyWordArray = CryptoJS.enc.Hex.parse("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f");
     } else {
-        // In production, fail completely
         throw new Error("Invalid encryption key configuration. Application cannot start.");
     }
 }
@@ -134,10 +130,11 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   const headers = new Headers(options.headers || {});
   
-  // Token JWT para autenticação no backend
-  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || ""
+  // Shared secret to authenticate the frontend application itself to the backend.
+  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "";
   headers.set('X-Token', BACKEND_API_TOKEN);
 
+  // User's JWT for user-specific authentication.
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
   }
