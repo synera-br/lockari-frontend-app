@@ -8,7 +8,8 @@ import { debugError, debugLog, debugWarn, debugInfo } from '@/lib/debug';
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "";
+const ENCRYPTION_KEY = (process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "").trim();
+const BACKEND_API_TOKEN = (process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "").trim();
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
 
@@ -131,7 +132,6 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
   const headers = new Headers(options.headers || {});
   
   // Shared secret to authenticate the frontend application itself to the backend.
-  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "";
   headers.set('X-Token', BACKEND_API_TOKEN);
 
   // User's JWT for user-specific authentication.
