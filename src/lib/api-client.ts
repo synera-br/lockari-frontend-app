@@ -134,8 +134,9 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   const headers = new Headers(options.headers || {});
   
-  // The backend expects this header for application authentication.
-  headers.set('X-Token', ENCRYPTION_KEY);
+  // Token JWT para autenticação no backend
+  const BACKEND_API_TOKEN = process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || ""
+  headers.set('X-Token', BACKEND_API_TOKEN);
 
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
