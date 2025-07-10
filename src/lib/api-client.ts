@@ -4,6 +4,14 @@ import CryptoJS from 'crypto-js';
 import { BACKEND_URL } from '@/lib/firebase/config';
 import { debugError, debugLog, debugWarn, debugInfo } from '@/lib/debug';
 
+// Initial environment variable check
+debugInfo("🔍 Environment check:", {
+    hasEncryptionKey: !!process.env.NEXT_PUBLIC_ENCRYPTION_KEY,
+    keyLength: process.env.NEXT_PUBLIC_ENCRYPTION_KEY?.length || 0,
+    keyPreview: process.env.NEXT_PUBLIC_ENCRYPTION_KEY?.substring(0, 20) + "...",
+    mode: process.env.NEXT_PUBLIC_MODE
+});
+
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
@@ -11,6 +19,7 @@ const ENCRYPTION_KEY = (process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "").trim().rep
 const BACKEND_API_TOKEN = (process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "").trim();
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
+
 
 /**
  * Validates the encryption key's format and size, similar to the Go backend.
