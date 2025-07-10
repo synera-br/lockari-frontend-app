@@ -71,11 +71,11 @@ export async function signupUser(userData: {
   }
 
   if (process.env.NEXT_PUBLIC_MODE === 'develop') {
-    console.log('🔍 [DEBUG] Enviando signup para backend:', `${BACKEND_URL}/api/v1/auth/signup`);
+    console.log('🔍 [DEBUG] Enviando signup para backend:', `${BACKEND_URL}/v1/auth/signup`);
   }
 
   try {
-    const response = await fetchWithAuthHeaders(`${BACKEND_URL}/api/v1/auth/signup`, {
+    const response = await fetchWithAuthHeaders(`${BACKEND_URL}/v1/auth/signup`, {
       method: 'POST',
       body: JSON.stringify(payload),
     });
