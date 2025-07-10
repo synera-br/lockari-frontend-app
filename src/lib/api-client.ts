@@ -30,7 +30,7 @@ export async function fetchWithAuthHeaders(url: string, options: RequestInit = {
 
   const headers = new Headers(options.headers || {});
   
-  headers.set('X-Token', BACKEND_API_TOKEN);
+  headers.set('X-TOKEN', BACKEND_API_TOKEN);
 
   if (token) {
     headers.set('X-AUTHORIZATION', `Bearer ${token}`);
