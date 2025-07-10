@@ -8,7 +8,7 @@ import { debugError, debugLog, debugWarn, debugInfo } from '@/lib/debug';
 const APP_NAME = 'LockariVaultApp';
 const API_TIMEOUT = 15000; // 15 seconds
 
-const ENCRYPTION_KEY = (process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "").trim();
+const ENCRYPTION_KEY = (process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "").trim().replace(/\n/g, '');
 const BACKEND_API_TOKEN = (process.env.NEXT_PUBLIC_BACKEND_API_TOKEN || "").trim();
 
 let encryptionKeyWordArray: CryptoJS.lib.WordArray;
